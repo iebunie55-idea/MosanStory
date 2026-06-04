@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  background: #f7f8fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  color: #111827;
+  background: #f7f8fa;
+  font-family: Pretendard, SUIT, Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  letter-spacing: 0;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: #f3c33a;
+  color: #031225;
+}
+
+@keyframes pageIn {
+  from {
+    opacity: 0.2;
+    transform: rotateY(8deg) translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: rotateY(0deg) translateY(0);
+  }
+}
+
+@keyframes storyMascotFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg) scale(1);
+  }
+
+  35% {
+    transform: translateY(-18px) rotate(2.5deg) scale(1.035);
+  }
+
+  65% {
+    transform: translateY(-8px) rotate(-1deg) scale(0.995);
+  }
+}
+
+.story-mascot-float {
+  animation: storyMascotFloat 2.8s ease-in-out infinite;
+  transform-origin: 50% 80%;
+  will-change: transform;
+}
+
+.section-wrap {
+  width: min(100% - 40px, 1180px);
+  margin-inline: auto;
+}
+
+.section-padding {
+  padding-block: 140px;
+}
+
+@media (max-width: 1199px) {
+  .section-padding {
+    padding-block: 100px;
+  }
+}
+
+@media (max-width: 767px) {
+  .section-wrap {
+    width: min(100% - 32px, 1180px);
+  }
+
+  .section-padding {
+    padding-block: 72px;
+  }
+}
