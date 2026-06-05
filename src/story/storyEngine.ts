@@ -111,7 +111,7 @@ export async function generateStory(selection: StorySelection): Promise<StoryRes
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ selection })
       },
-      10000
+      20000
     );
 
     if (!response.ok) {

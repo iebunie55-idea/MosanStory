@@ -10,6 +10,7 @@ const providerName = (process.env.PROVIDER || "gemini").toLowerCase();
 const maxPerMinute = Number(process.env.MAX_PER_MIN || 20);
 // Gemini 네이티브 이미지 생성 (무료 티어 지원)
 const geminiImageModel = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+const geminiThinkingBudget = Number(process.env.GEMINI_THINKING_BUDGET ?? 0);
 const rateBuckets = new Map();
 
 app.use(cors({ origin: true }));
@@ -17,7 +18,7 @@ app.use(express.json({ limit: "64kb" }));
 
 const providers = {
   gemini: {
-    model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
     key: process.env.GEMINI_API_KEY,
     call: callGemini
   },
@@ -81,7 +82,7 @@ function buildPrompt(selection) {
     "1) 정확히 6쪽짜리 동화로 쓴다.",
     "2) 1쪽은 배경과 주인공 소개, 2쪽은 발단, 3쪽은 전개, 4쪽은 절정, 5쪽은 해결 행동, 6쪽은 결말과 배운 점으로 구성한다.",
     "3) 선택한 사건 문장을 그대로 복사하거나 따옴표로 넣지 말고, 자연스러운 장면으로 바꾸어 쓴다.",
-    "4) 각 쪽은 1~2문장, 쉬운 낱말, 존댓말(\"~했어요\")로 쓴다.",
+    "4) 각 쪽은 1문장으로 쓰고, 45~75자 안에서 쉬운 낱말과 존댓말(\"~했어요\")을 쓴다.",
     "5) 이전 쪽의 결과 때문에 다음 쪽 사건이 일어나도록 원인과 결과를 이어 준다.",
     "6) 주인공의 성격이 문제를 해결하는 행동으로 드러나야 한다.",
     "7) 주인공 이름의 조사를 받침에 맞게 올바르게 쓴다.",
@@ -161,7 +162,7 @@ function parseScenes(rawText) {
   for (const candidate of candidates) {
     try {
       const parsed = JSON.parse(candidate);
-      const scenes = Array.isArray(parsed) ? parsed : parsed.scenes;
+      const scenes = Array.isArray(parsed) ? parsed : parsed.scenes || parsed.pages;
       if (Array.isArray(scenes) && scenes.length >= 6) {
         return scenes.slice(0, 6).map((scene) => String(scene).trim()).filter(Boolean);
       }
@@ -193,15 +194,24 @@ async function fetchJson(url, options, timeoutMs = 8000) {
 
 async function callGemini(provider, prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${provider.model}:generateContent?key=${provider.key}`;
+  const generationConfig = {
+    maxOutputTokens: 2048,
+    responseMimeType: "application/json"
+  };
+
+  if (provider.model.includes("2.5") && Number.isFinite(geminiThinkingBudget)) {
+    generationConfig.thinkingConfig = { thinkingBudget: geminiThinkingBudget };
+  }
+
   const data = await fetchJson(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 1000, responseMimeType: "application/json" }
+      generationConfig
     })
-  });
+  }, 15000);
 
   return data.candidates?.[0]?.content?.parts?.map((part) => part.text).join("\n") || "";
 }
@@ -290,7 +300,8 @@ app.get("/api/health", (req, res) => {
     model: provider.model,
     keyLoaded: Boolean(provider.key),
     imageModel: geminiImageModel,
-    imageKeyLoaded: Boolean(providers.gemini.key)
+    imageKeyLoaded: Boolean(providers.gemini.key),
+    thinkingBudget: geminiThinkingBudget
   });
 });
 

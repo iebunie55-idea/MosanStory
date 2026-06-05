@@ -284,6 +284,24 @@ function SecondaryButton({
   );
 }
 
+function HeaderActionButton({
+  children,
+  onClick
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-2xl border border-[#FFB15D]/65 bg-[#F0633C] px-3 text-sm font-black text-white shadow-[0_0_18px_rgba(240,99,60,0.22)] transition active:scale-[0.98]"
+    >
+      {children}
+    </button>
+  );
+}
+
 function KioskArtwork({
   place,
   generatedImage,
@@ -455,13 +473,13 @@ function StoryTextPanel({
   onNext: () => void;
 }) {
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-2">
       <article
         key={`text-${pageIndex}`}
-        className="animate-[pageIn_360ms_ease-out] flex min-h-0 flex-1 flex-col justify-center rounded-[24px] border-2 border-[#FFB15D]/45 bg-[#FFFDF7] p-6 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.7),0_0_20px_rgba(255,177,93,0.16)] lg:p-8"
+        className="animate-[pageIn_360ms_ease-out] flex min-h-0 flex-1 flex-col justify-center rounded-[24px] border-2 border-[#FFB15D]/45 bg-[#FFFDF7] p-7 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.7),0_0_20px_rgba(255,177,93,0.16)] lg:p-9"
       >
         <p className="mb-3 text-sm font-black text-[#A16B32]">{pageIndex + 1} / {story.pages.length}쪽</p>
-        <p className="text-[clamp(20px,2.1vw,28px)] font-bold leading-[1.62] text-[#312D29]">{story.pages[pageIndex]}</p>
+        <p className="text-[clamp(22px,2.25vw,32px)] font-bold leading-[1.58] text-[#312D29]">{story.pages[pageIndex]}</p>
       </article>
       <div className="grid grid-cols-2 gap-3">
         <SecondaryButton onClick={onPrev}>
@@ -956,9 +974,9 @@ export function StoryKioskApp() {
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(255,126,72,0.24),transparent_34%),radial-gradient(circle_at_82%_10%,rgba(45,107,255,0.24),transparent_32%),radial-gradient(circle_at_50%_90%,rgba(125,232,255,0.16),transparent_45%),linear-gradient(180deg,#151936_0%,#090D20_100%)]" />
       <div className="pointer-events-none fixed inset-6 rounded-[34px] border-4 border-[#244DFF] shadow-[inset_0_0_0_3px_rgba(255,177,93,0.85),0_0_34px_rgba(36,77,255,0.42)]" />
 
-      <section className={["relative grid h-full min-h-0 overflow-hidden p-6 sm:p-8 lg:p-12", step === "login" || step === "attract" ? "grid-rows-1" : "grid-rows-[auto_minmax(0,1fr)]"].join(" ")}>
+      <section className={["relative grid h-full min-h-0 overflow-hidden p-5 sm:p-6 lg:p-8", step === "login" || step === "attract" ? "grid-rows-1" : "grid-rows-[auto_minmax(0,1fr)]"].join(" ")}>
         {step !== "login" && step !== "attract" ? (
-          <header className="z-10 mx-auto flex w-full max-w-[1180px] flex-wrap items-center justify-between gap-3 pb-3">
+          <header className="z-10 mx-auto flex w-full max-w-[1560px] flex-wrap items-center justify-between gap-3 pb-2">
             <div className="flex items-center gap-4">
               <img
                 src="/images/mori-mascot-transparent.png"
@@ -975,6 +993,19 @@ export function StoryKioskApp() {
             </div>
             <div className="flex items-center gap-3">
               {step !== "loading" && step !== "result" ? <Progress activeStep={step} /> : null}
+              {step === "result" ? (
+                <div className="flex items-center gap-2">
+                  <HeaderActionButton onClick={reset}>
+                    처음으로 <HomeIcon className="h-5 w-5" />
+                  </HeaderActionButton>
+                  <HeaderActionButton onClick={createStory}>
+                    다시 짓기 <ArrowPathIcon className="h-5 w-5" />
+                  </HeaderActionButton>
+                  <HeaderActionButton onClick={() => setStep("character")}>
+                    새 동화 <SparklesIcon className="h-5 w-5" />
+                  </HeaderActionButton>
+                </div>
+              ) : null}
               {classId ? (
                 <div className="rounded-full border border-[#FFB15D]/45 bg-[#2E2442]/82 px-4 py-2 text-sm font-black text-[#FFE9B0]">
                   {classId}
@@ -1068,8 +1099,8 @@ export function StoryKioskApp() {
           </button>
           </div>
         ) : (
-        <div className={["z-10 mx-auto grid h-full min-h-0 w-full max-w-[1320px] overflow-hidden", step === "result" ? "grid-rows-[minmax(0,1fr)_auto] gap-2" : "grid-rows-1"].join(" ")}>
-        <div className="grid min-h-0 w-full grid-cols-1 gap-4 overflow-hidden py-2 lg:grid-cols-[minmax(0,0.9fr)_minmax(520px,1.1fr)] lg:items-stretch">
+        <div className={["z-10 mx-auto grid h-full min-h-0 w-full max-w-[1560px] overflow-hidden", step === "result" ? "grid-rows-[minmax(0,1fr)_auto] gap-2" : "grid-rows-1"].join(" ")}>
+        <div className="grid min-h-0 w-full grid-cols-1 gap-4 overflow-hidden py-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(520px,1.15fr)] lg:items-stretch">
           <div className="relative min-h-0 overflow-hidden rounded-[30px] border-2 border-[#FFB15D]/80 bg-[#111936]/78 shadow-[0_0_36px_rgba(45,107,255,0.28)]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(125,232,255,0.18),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0))]" />
             <KioskArtwork place={place} generatedImage={currentSceneImage} guideText={mascotGuide} />
@@ -1285,17 +1316,6 @@ export function StoryKioskApp() {
                   <SecondaryButton onClick={generatePrintableImages} disabled={Boolean(imageGenerationMode) || printableImagesReady}>
                     <PrinterIcon className="h-5 w-5" /> {imageGenerationMode === "print" ? "출력용 그림 생성 중" : printableImagesReady ? "출력용 그림 완료" : "출력용 그림 만들기"}
                   </SecondaryButton>
-                </div>
-                <div className="mt-auto grid grid-cols-1 gap-2 border-t border-[#73DFFF]/20 pt-2 sm:grid-cols-3">
-                  <PrimaryButton onClick={reset}>
-                    처음으로 <HomeIcon className="h-6 w-6" />
-                  </PrimaryButton>
-                  <PrimaryButton onClick={createStory}>
-                    다시 짓기 <ArrowPathIcon className="h-6 w-6" />
-                  </PrimaryButton>
-                  <PrimaryButton onClick={() => setStep("character")}>
-                    새 동화 <SparklesIcon className="h-6 w-6" />
-                  </PrimaryButton>
                 </div>
               </div>
             ) : null}
