@@ -10,9 +10,16 @@ export const metadata: Metadata = {
   description: "모산초등학교 3~6학년을 위한 AI 동화책 만들기 수업 앱입니다.",
   keywords: ["모산초등학교", "AI 동화", "PWA", "동화 만들기", "수업 앱"],
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/images/buyeo-mascot.png",
+    apple: "/images/buyeo-mascot.png"
+  },
   appleWebApp: {
     capable: true,
     title: "모산 AI 동화"
+  },
+  other: {
+    "mobile-web-app-capable": "yes"
   },
   openGraph: {
     title: "모산 AI 동화 만들기",

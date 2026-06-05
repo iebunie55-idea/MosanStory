@@ -1004,7 +1004,7 @@ export function StoryKioskApp() {
             className="z-10 grid min-h-0 place-items-center px-3 py-5 text-center focus:outline-none"
             aria-label="동화 만들기 시작"
           >
-            <span className="relative flex w-full max-w-[1120px] flex-col items-center justify-center gap-5 rounded-[34px] px-6 py-8 sm:px-10 lg:min-h-[calc(100vh-150px)]">
+            <span className="relative flex w-full max-w-[1120px] flex-col items-center justify-center gap-3 rounded-[34px] px-6 py-6 sm:px-10 lg:min-h-[calc(100vh-96px)]">
               <span className="pointer-events-none absolute left-[8%] top-[14%] h-20 w-20 rounded-full border border-[#7DFFD4]/25" />
               <span className="pointer-events-none absolute right-[10%] top-[20%] h-28 w-28 rounded-full border border-[#FFB15D]/25" />
               <span className="pointer-events-none absolute bottom-[12%] left-[18%] h-3 w-3 rotate-45 bg-[#FFE17A] shadow-[0_0_20px_rgba(255,225,122,0.7)]" />
@@ -1014,16 +1014,16 @@ export function StoryKioskApp() {
                 <span className="text-[clamp(18px,2.2vw,34px)] font-black tracking-[0.14em] text-[#7DFFD4] drop-shadow-[0_0_14px_rgba(125,255,212,0.34)]">
                   [{schoolLabel}]
                 </span>
-                <span className="text-[clamp(28px,4vw,64px)] font-black leading-tight text-white drop-shadow-[0_0_20px_rgba(125,232,255,0.28)]">
+                <span className="text-[clamp(26px,3.4vw,52px)] font-black leading-tight text-white drop-shadow-[0_0_20px_rgba(125,232,255,0.28)]">
                   AI와 함께 만드는 나만의 동화책
                 </span>
               </span>
 
-              <span className="mt-2 text-[clamp(72px,11vw,170px)] font-black leading-none text-white drop-shadow-[0_0_38px_rgba(125,232,255,0.36)]">
+              <span className="mt-1 text-[clamp(58px,8.4vw,112px)] font-black leading-none text-white drop-shadow-[0_0_38px_rgba(125,232,255,0.36)]">
                 동화 만들기
               </span>
 
-              <span aria-hidden="true" className="story-mascot-float relative mt-1 block h-[clamp(160px,22vw,300px)] w-[clamp(160px,22vw,300px)]">
+              <span aria-hidden="true" className="story-mascot-float relative mt-1 block h-[clamp(130px,16vw,210px)] w-[clamp(130px,16vw,210px)]">
                 <span className="absolute inset-x-[18%] bottom-1 h-8 rounded-full bg-[#050914]/55 blur-xl" />
                 <img
                   src="/images/buyeo-mascot-transparent.png"
@@ -1033,7 +1033,7 @@ export function StoryKioskApp() {
                 />
               </span>
 
-              <span className="relative -mt-2 rounded-[22px] border border-[#FFB15D]/70 bg-white px-7 py-4 text-[clamp(18px,2vw,28px)] font-black text-[#15203C] shadow-[0_16px_34px_rgba(0,0,0,0.24)]">
+              <span className="relative rounded-[22px] border border-[#FFB15D]/70 bg-white px-7 py-4 text-[clamp(17px,1.8vw,24px)] font-black text-[#15203C] shadow-[0_16px_34px_rgba(0,0,0,0.24)]">
                 화면을 눌러 나만의 동화를 시작해요!
               </span>
 
