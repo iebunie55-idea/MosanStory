@@ -12,6 +12,8 @@ export type ClassLoginDecision = {
   message: string;
 };
 
+export const classSessionStorageKey = "mosan-story.classSession.v1";
+
 export function normalizeClassId(value: string) {
   const compact = value.trim().toLowerCase().replace(/\s+/g, "");
   const match = compact.match(/^mosan-?(\d{1,3})$/);

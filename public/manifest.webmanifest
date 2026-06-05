@@ -1,0 +1,19 @@
+{
+  "name": "모산 AI 동화 만들기",
+  "short_name": "모산동화",
+  "description": "모산초등학교 3~6학년 AI 동화책 만들기",
+  "start_url": "/story",
+  "display": "standalone",
+  "background_color": "#090D20",
+  "theme_color": "#244DFF",
+  "lang": "ko-KR",
+  "orientation": "landscape-primary",
+  "icons": [
+    {
+      "src": "/images/buyeo-mascot.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

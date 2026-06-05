@@ -8,15 +8,19 @@ import {
   CheckIcon,
   ClockIcon,
   HomeIcon,
+  MusicalNoteIcon,
   PrinterIcon,
   SparklesIcon
 } from "@heroicons/react/24/solid";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildStoryPdfMetadata } from "./pdfMetadata";
+import { classSessionStorageKey, normalizeClassId } from "./classSession";
 import { characters, eventGroups, places, traits } from "./storyData";
 import { checkProxyHealth, generateSceneImage, generateStory, localStory } from "./storyEngine";
+import { nextMusicState, type StoryMusicState } from "./storyMusic";
 import type { CharacterChoice, Choice, PlaceChoice, StoryResult, StorySelection } from "./storyTypes";
 
-type Step = "attract" | "character" | "trait" | "place" | "events" | "loading" | "result";
+type Step = "login" | "attract" | "character" | "trait" | "place" | "events" | "loading" | "result";
 type ImageGenerationMode = "cover" | "print" | null;
 type SavedStory = {
   id: string;
@@ -38,6 +42,7 @@ const defaultPlace = places[0];
 const savedStoriesKey = "buyeo-ai-story.savedStories.v1";
 const maxSavedStories = 8;
 const blockedCustomWords = ["바보", "죽", "살인", "폭력", "피", "혐오", "욕", "나쁜말"];
+const schoolLabel = "모산초등학교 3~6학년 동화 만들기";
 
 function sanitizeCustomChoice(value: string) {
   return value
@@ -98,6 +103,31 @@ function writeSavedStories(stories: SavedStory[]) {
   } catch {
     window.localStorage.removeItem(savedStoriesKey);
   }
+}
+
+function readClassSession() {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const value = window.localStorage.getItem(classSessionStorageKey);
+    if (!value) return null;
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed.classId === "string" && typeof parsed.sessionToken === "string") {
+      return parsed as { classId: string; sessionToken: string };
+    }
+  } catch {
+    window.localStorage.removeItem(classSessionStorageKey);
+  }
+
+  return null;
+}
+
+function writeClassSession(classId: string) {
+  const current = readClassSession();
+  const sessionToken = current?.classId === classId ? current.sessionToken : `mosan-device-${Date.now()}`;
+  const next = { classId, sessionToken };
+  window.localStorage.setItem(classSessionStorageKey, JSON.stringify(next));
+  return next;
 }
 
 function formatSavedStoryDate(value: string) {
@@ -545,7 +575,10 @@ function dataUrlToObjectUrl(dataUrl: string) {
 }
 
 export function StoryKioskApp() {
-  const [step, setStep] = useState<Step>("attract");
+  const [step, setStep] = useState<Step>("login");
+  const [classIdInput, setClassIdInput] = useState("");
+  const [classId, setClassId] = useState("");
+  const [classLoginMessage, setClassLoginMessage] = useState("");
   const [character, setCharacter] = useState<CharacterChoice>(defaultCharacter);
   const [trait, setTrait] = useState<Choice>(defaultTrait);
   const [place, setPlace] = useState<PlaceChoice>(defaultPlace);
@@ -575,10 +608,17 @@ export function StoryKioskApp() {
     ending: ""
   });
   const [customError, setCustomError] = useState("");
+  const [musicState, setMusicState] = useState<StoryMusicState>("paused");
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const musicIntervalRef = useRef<number | null>(null);
   // 자동 생성 대상 4장면: 시작, 발단, 절정, 결말
   const IMAGE_PAGES = [0, 1, 3, 5] as const;
 
   const selection = useMemo(() => buildSelection(character, trait, place, events), [character, trait, place, events]);
+  const pdfMetadata = useMemo(
+    () => buildStoryPdfMetadata({ classId: classId || "mosan-demo", characterName: character.name, createdAt: new Date() }),
+    [character.name, classId]
+  );
   const currentStepIndex = stepOrder.indexOf(step);
   const currentSceneImage = step === "result" ? sceneImages[pageIndex] || fallbackSceneImage(sceneImages, pageIndex) : undefined;
   const mascotGuide = useMemo(() => mascotGuideForStep(step, character.name), [character.name, step]);
@@ -601,10 +641,79 @@ export function StoryKioskApp() {
     );
   }, [activeSavedStoryId, persistSavedStories]);
 
+  const stopStoryMusic = useCallback(() => {
+    if (musicIntervalRef.current) {
+      window.clearInterval(musicIntervalRef.current);
+      musicIntervalRef.current = null;
+    }
+
+    void audioContextRef.current?.close();
+    audioContextRef.current = null;
+  }, []);
+
+  const playMusicNote = useCallback((frequency: number) => {
+    const context = audioContextRef.current;
+    if (!context) return;
+
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, context.currentTime);
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.055, context.currentTime + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.78);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.82);
+  }, []);
+
+  const startStoryMusic = useCallback(() => {
+    const AudioContextConstructor =
+      window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextConstructor) return;
+
+    stopStoryMusic();
+    audioContextRef.current = new AudioContextConstructor();
+    const notes = [392, 494, 587, 659, 587, 494];
+    let index = 0;
+    playMusicNote(notes[index]);
+    musicIntervalRef.current = window.setInterval(() => {
+      index = (index + 1) % notes.length;
+      playMusicNote(notes[index]);
+    }, 900);
+  }, [playMusicNote, stopStoryMusic]);
+
+  function toggleStoryMusic() {
+    const nextState = nextMusicState(musicState);
+    setMusicState(nextState);
+    if (nextState === "playing") {
+      startStoryMusic();
+    } else {
+      stopStoryMusic();
+    }
+  }
+
   const reset = useCallback(() => {
+    stopStoryMusic();
+    setMusicState("paused");
     setStep("attract");
     setPageIndex(0);
-  }, []);
+  }, [stopStoryMusic]);
+
+  function enterClassSession() {
+    const normalized = normalizeClassId(classIdInput);
+    if (!/^mosan-\d{3}$/.test(normalized)) {
+      setClassLoginMessage("아이디는 예: mosan-001 처럼 입력해 주세요.");
+      return;
+    }
+
+    writeClassSession(normalized);
+    setClassId(normalized);
+    setClassIdInput(normalized);
+    setClassLoginMessage("좋아요. 이제 나만의 동화책을 만들어요.");
+    setStep("attract");
+  }
 
   function openSavedStory(savedStory: SavedStory) {
     setCharacter(savedStory.character);
@@ -621,10 +730,16 @@ export function StoryKioskApp() {
   useEffect(() => {
     checkProxyHealth().then(setHealth);
     setSavedStories(readSavedStories());
+    const session = readClassSession();
+    if (session) {
+      setClassId(session.classId);
+      setClassIdInput(session.classId);
+      setStep("attract");
+    }
   }, []);
 
   useEffect(() => {
-    if (step === "attract") return undefined;
+    if (step === "login" || step === "attract") return undefined;
 
     const eventsToWatch = ["pointerdown", "keydown", "touchstart"];
     let timeout = window.setTimeout(reset, 90000);
@@ -639,6 +754,14 @@ export function StoryKioskApp() {
       eventsToWatch.forEach((eventName) => window.removeEventListener(eventName, refresh));
     };
   }, [reset, step]);
+
+  useEffect(() => {
+    if (step === "result") return undefined;
+
+    stopStoryMusic();
+    setMusicState("paused");
+    return undefined;
+  }, [step, stopStoryMusic]);
 
   async function createStory() {
     const storySelection = selection;
@@ -702,8 +825,8 @@ export function StoryKioskApp() {
   }
   function getPrintableHtml(images: Record<number, string> = sceneImages) {
     return buildPrintableStoryHtml({
-      title: `${character.name}의 모험`,
-      place: place.name,
+      title: pdfMetadata.title,
+      place: `${pdfMetadata.schoolLabel} · ${place.name} · ${classId || "연습 아이디"}`,
       pages: story.pages,
       images
     });
@@ -715,7 +838,7 @@ export function StoryKioskApp() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${character.name.replace(/\s+/g, "-")}-동화책.html`;
+    link.download = pdfMetadata.filename.replace(".pdf", ".html");
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -733,8 +856,8 @@ export function StoryKioskApp() {
       })
     ) as Record<number, string>;
     const html = buildPrintableStoryHtml({
-      title: `${character.name}의 모험`,
-      place: place.name,
+      title: pdfMetadata.title,
+      place: `${pdfMetadata.schoolLabel} · ${place.name} · ${classId || "연습 아이디"}`,
       pages: story.pages,
       images: printImages
     });
@@ -799,8 +922,8 @@ export function StoryKioskApp() {
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(255,126,72,0.24),transparent_34%),radial-gradient(circle_at_82%_10%,rgba(45,107,255,0.24),transparent_32%),radial-gradient(circle_at_50%_90%,rgba(125,232,255,0.16),transparent_45%),linear-gradient(180deg,#151936_0%,#090D20_100%)]" />
       <div className="pointer-events-none fixed inset-6 rounded-[34px] border-4 border-[#244DFF] shadow-[inset_0_0_0_3px_rgba(255,177,93,0.85),0_0_34px_rgba(36,77,255,0.42)]" />
 
-      <section className={["relative grid min-h-screen p-6 sm:p-8 lg:p-12", step === "attract" ? "grid-rows-1" : "grid-rows-[auto_1fr]"].join(" ")}>
-        {step !== "attract" ? (
+      <section className={["relative grid min-h-screen p-6 sm:p-8 lg:p-12", step === "login" || step === "attract" ? "grid-rows-1" : "grid-rows-[auto_1fr]"].join(" ")}>
+        {step !== "login" && step !== "attract" ? (
           <header className="z-10 mx-auto flex w-full max-w-[1180px] flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <img
@@ -811,20 +934,69 @@ export function StoryKioskApp() {
                 draggable={false}
               />
               <div>
-                <p className="text-base font-black tracking-[0.08em] text-[#7DFFD4]">[부여 AI STORY]</p>
+                <p className="text-base font-black tracking-[0.08em] text-[#7DFFD4]">[{schoolLabel}]</p>
                 <h1 className="mt-1 text-2xl font-black text-white drop-shadow-[0_0_16px_rgba(125,232,255,0.32)] sm:text-3xl">
-                  AI와 함께 만드는 동화
+                  AI와 함께 만드는 나만의 동화책
                 </h1>
               </div>
             </div>
             <div className="flex items-center gap-3">
               {step !== "loading" && step !== "result" ? <Progress activeStep={step} /> : null}
+              {classId ? (
+                <div className="rounded-full border border-[#FFB15D]/45 bg-[#2E2442]/82 px-4 py-2 text-sm font-black text-[#FFE9B0]">
+                  {classId}
+                </div>
+              ) : null}
               <StatusPill health={health} />
             </div>
           </header>
         ) : null}
 
-        {step === "attract" ? (
+        {step === "login" ? (
+          <div className="z-10 grid min-h-0 place-items-center px-3 py-5 text-center">
+            <div className="grid w-full max-w-[980px] gap-6 rounded-[34px] border-2 border-[#73DFFF]/35 bg-[#101A38]/82 px-6 py-8 shadow-[0_0_42px_rgba(36,77,255,0.28)] backdrop-blur sm:px-10">
+              <div className="grid gap-3">
+                <p className="text-[clamp(18px,2vw,30px)] font-black tracking-[0.12em] text-[#7DFFD4]">
+                  {schoolLabel}
+                </p>
+                <h1 className="text-[clamp(42px,6vw,86px)] font-black leading-tight text-white drop-shadow-[0_0_28px_rgba(125,232,255,0.35)]">
+                  AI와 함께 나만의 동화책 만들기
+                </h1>
+                <p className="mx-auto max-w-[720px] text-[clamp(18px,2vw,26px)] font-bold leading-relaxed text-[#D4F5FF]">
+                  주인공을 고르고, 사건을 이어 붙이면 세상에 하나뿐인 6쪽 동화책이 완성돼요.
+                </p>
+              </div>
+
+              <div className="mx-auto grid w-full max-w-[560px] gap-3 rounded-[24px] border border-[#FFB15D]/45 bg-[#0B1029]/80 p-4 text-left">
+                <label className="text-base font-black text-[#FFE9B0]" htmlFor="class-id">
+                  선생님이 알려준 수업 아이디
+                </label>
+                <div className="grid grid-cols-[1fr_auto] gap-3">
+                  <input
+                    id="class-id"
+                    value={classIdInput}
+                    onChange={(event) => setClassIdInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") enterClassSession();
+                    }}
+                    placeholder="예: mosan-001"
+                    className="min-h-16 min-w-0 rounded-2xl border-2 border-[#73DFFF]/30 bg-[#151F41] px-5 text-xl font-black text-white outline-none placeholder:text-[#D4F5FF]/45 focus:border-[#FFB15D]"
+                  />
+                  <button
+                    type="button"
+                    onClick={enterClassSession}
+                    className="min-h-16 rounded-2xl border-2 border-[#FFB15D] bg-[#F0633C] px-6 text-lg font-black text-white shadow-[0_0_24px_rgba(240,99,60,0.26)] active:scale-[0.98]"
+                  >
+                    시작
+                  </button>
+                </div>
+                <p className="min-h-6 text-sm font-black text-[#FFD073]">
+                  {classLoginMessage || "아이디를 입력하면 동화 만들기 화면으로 들어가요."}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : step === "attract" ? (
           <div className="z-10 grid min-h-0 gap-5">
           <button
             type="button"
@@ -840,10 +1012,10 @@ export function StoryKioskApp() {
 
               <span className="flex flex-col items-center gap-2">
                 <span className="text-[clamp(18px,2.2vw,34px)] font-black tracking-[0.14em] text-[#7DFFD4] drop-shadow-[0_0_14px_rgba(125,255,212,0.34)]">
-                  [부여 AI STORY]
+                  [{schoolLabel}]
                 </span>
                 <span className="text-[clamp(28px,4vw,64px)] font-black leading-tight text-white drop-shadow-[0_0_20px_rgba(125,232,255,0.28)]">
-                  AI와 함께 만드는 동화
+                  AI와 함께 만드는 나만의 동화책
                 </span>
               </span>
 
@@ -1060,7 +1232,8 @@ export function StoryKioskApp() {
                   <p className="text-base font-black text-[#7DFFD4]">
                     {story.source === "ai" ? "AI가 새로 지은 동화" : "내장 엔진 동화"}
                   </p>
-                  <h2 className="text-3xl font-black">{character.name}의 모험</h2>
+                  <h2 className="text-3xl font-black">{pdfMetadata.title}</h2>
+                  <p className="mt-1 text-sm font-black text-[#D4F5FF]">{classId || "연습 아이디"} · {place.name}</p>
                 </div>
                 <StoryTextPanel
                   story={story}
@@ -1069,6 +1242,11 @@ export function StoryKioskApp() {
                   onPrev={() => setPageIndex((current) => Math.max(0, current - 1))}
                   onNext={() => setPageIndex((current) => Math.min(story.pages.length - 1, current + 1))}
                 />
+                <div className="rounded-2xl border border-[#FFB15D]/30 bg-[#2E2442]/72 p-3">
+                  <SecondaryButton onClick={toggleStoryMusic}>
+                    <MusicalNoteIcon className="h-5 w-5" /> {musicState === "playing" ? "배경음악 끄기" : "배경음악 켜기"}
+                  </SecondaryButton>
+                </div>
                 <div className="grid grid-cols-1 gap-3 rounded-2xl border border-[#73DFFF]/20 bg-[#0B1029]/72 p-3 sm:grid-cols-2">
                   <SecondaryButton onClick={generateCoverImage} disabled={Boolean(imageGenerationMode) || Boolean(sceneImages[0])}>
                     <SparklesIcon className="h-5 w-5" /> {imageGenerationMode === "cover" ? "대표 그림 생성 중" : sceneImages[0] ? "대표 그림 완료" : "대표 그림 만들기"}
@@ -1129,11 +1307,11 @@ export function StoryKioskApp() {
         </div>
         {step === "result" ? (
           <div className="z-10 mx-auto grid w-full max-w-[1180px] grid-cols-2 gap-4 pb-2">
-            <SecondaryButton onClick={downloadStorybook} disabled={Boolean(imageGenerationMode)}>
-              <ArrowDownTrayIcon className="h-5 w-5" /> 완성본 다운로드
-            </SecondaryButton>
             <SecondaryButton onClick={printStorybook} disabled={Boolean(imageGenerationMode)}>
-              <PrinterIcon className="h-5 w-5" /> {imageGenerationMode === "print" ? "출력 준비 중" : "인쇄하기"}
+              <ArrowDownTrayIcon className="h-5 w-5" /> {imageGenerationMode === "print" ? "PDF 준비 중" : "PDF로 저장하기"}
+            </SecondaryButton>
+            <SecondaryButton onClick={downloadStorybook} disabled={Boolean(imageGenerationMode)}>
+              <PrinterIcon className="h-5 w-5" /> HTML 백업 저장
             </SecondaryButton>          </div>
         ) : null}
         </>

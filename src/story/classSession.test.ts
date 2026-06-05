@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { decideClassLogin, normalizeClassId } from "./classSession";
+import { classSessionStorageKey, decideClassLogin, normalizeClassId } from "./classSession";
 
 describe("normalizeClassId", () => {
   test("normalizes Mosan class IDs for young students typing on tablets", () => {
@@ -35,5 +35,11 @@ describe("decideClassLogin", () => {
       nextStatus: "completed",
       message: "이미 동화책을 완성한 아이디예요. 다시 필요하면 선생님께 알려주세요."
     });
+  });
+});
+
+describe("classSessionStorageKey", () => {
+  test("uses a stable storage key for the class session token", () => {
+    expect(classSessionStorageKey).toBe("mosan-story.classSession.v1");
   });
 });
