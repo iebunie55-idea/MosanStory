@@ -16,7 +16,15 @@ import { buildStoryPdfMetadata } from "./pdfMetadata";
 import { classSessionStorageKey, normalizeClassId } from "./classSession";
 import { characters, eventGroups, places, traits } from "./storyData";
 import { checkProxyHealth, generateSceneImage, generateStory, localStory } from "./storyEngine";
-import { nextMusicState, type StoryMusicState } from "./storyMusic";
+import {
+  defaultMusicGenreId,
+  getMusicGenre,
+  musicGenres,
+  nextMusicState,
+  type StoryMusicGenre,
+  type StoryMusicGenreId,
+  type StoryMusicState
+} from "./storyMusic";
 import type { CharacterChoice, Choice, PlaceChoice, StoryResult, StorySelection } from "./storyTypes";
 
 type Step = "login" | "attract" | "character" | "trait" | "place" | "events" | "loading" | "result";
@@ -625,6 +633,7 @@ export function StoryKioskApp() {
   });
   const [customError, setCustomError] = useState("");
   const [musicState, setMusicState] = useState<StoryMusicState>("paused");
+  const [musicGenreId, setMusicGenreId] = useState<StoryMusicGenreId>(defaultMusicGenreId);
   const audioContextRef = useRef<AudioContext | null>(null);
   const musicIntervalRef = useRef<number | null>(null);
   // 자동 생성 대상 4장면: 시작, 발단, 절정, 결말
@@ -638,6 +647,7 @@ export function StoryKioskApp() {
   const currentStepIndex = stepOrder.indexOf(step);
   const currentSceneImage = step === "result" ? sceneImages[pageIndex] || fallbackSceneImage(sceneImages, pageIndex) : undefined;
   const mascotGuide = useMemo(() => mascotGuideForStep(step, character.name), [character.name, step]);
+  const selectedMusicGenre = useMemo(() => getMusicGenre(musicGenreId), [musicGenreId]);
   const printableImagesReady = IMAGE_PAGES.every((index) => Boolean(sceneImages[index]));
   const currentPageImageLoading = Boolean(imageGenerationMode && IMAGE_PAGES.includes(pageIndex as typeof IMAGE_PAGES[number]) && !sceneImages[pageIndex]);
 
@@ -667,46 +677,54 @@ export function StoryKioskApp() {
     audioContextRef.current = null;
   }, []);
 
-  const playMusicNote = useCallback((frequency: number) => {
+  const playMusicNote = useCallback((frequency: number, genre: StoryMusicGenre) => {
     const context = audioContextRef.current;
     if (!context) return;
 
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    oscillator.type = "sine";
+    oscillator.type = genre.waveform;
     oscillator.frequency.setValueAtTime(frequency, context.currentTime);
     gain.gain.setValueAtTime(0.0001, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.055, context.currentTime + 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.78);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + genre.noteDuration);
     oscillator.connect(gain);
     gain.connect(context.destination);
     oscillator.start();
-    oscillator.stop(context.currentTime + 0.82);
+    oscillator.stop(context.currentTime + genre.noteDuration + 0.04);
   }, []);
 
-  const startStoryMusic = useCallback(() => {
+  const startStoryMusic = useCallback((genre: StoryMusicGenre = selectedMusicGenre) => {
     const AudioContextConstructor =
       window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextConstructor) return;
 
     stopStoryMusic();
     audioContextRef.current = new AudioContextConstructor();
-    const notes = [392, 494, 587, 659, 587, 494];
+    const notes = genre.notes;
     let index = 0;
-    playMusicNote(notes[index]);
+    playMusicNote(notes[index], genre);
     musicIntervalRef.current = window.setInterval(() => {
       index = (index + 1) % notes.length;
-      playMusicNote(notes[index]);
-    }, 900);
-  }, [playMusicNote, stopStoryMusic]);
+      playMusicNote(notes[index], genre);
+    }, genre.intervalMs);
+  }, [playMusicNote, selectedMusicGenre, stopStoryMusic]);
 
   function toggleStoryMusic() {
     const nextState = nextMusicState(musicState);
     setMusicState(nextState);
     if (nextState === "playing") {
-      startStoryMusic();
+      startStoryMusic(selectedMusicGenre);
     } else {
       stopStoryMusic();
+    }
+  }
+
+  function selectMusicGenre(id: StoryMusicGenreId) {
+    const nextGenre = getMusicGenre(id);
+    setMusicGenreId(nextGenre.id);
+    if (musicState === "playing") {
+      startStoryMusic(nextGenre);
     }
   }
 
@@ -1230,9 +1248,35 @@ export function StoryKioskApp() {
                   onNext={() => setPageIndex((current) => Math.min(story.pages.length - 1, current + 1))}
                 />
                 <div className="rounded-2xl border border-[#FFB15D]/30 bg-[#2E2442]/72 p-2">
-                  <SecondaryButton onClick={toggleStoryMusic}>
-                    <MusicalNoteIcon className="h-5 w-5" /> {musicState === "playing" ? "배경음악 끄기" : "배경음악 켜기"}
-                  </SecondaryButton>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-black text-[#FFE9B0]">배경음악 장르</p>
+                    <button
+                      type="button"
+                      onClick={toggleStoryMusic}
+                      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-[#73DFFF]/45 bg-[#101A38]/72 px-3 text-xs font-black text-[#DDFBFF] active:scale-[0.98]"
+                    >
+                      <MusicalNoteIcon className="h-4 w-4" /> {musicState === "playing" ? "정지" : "재생"}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {musicGenres.map((genre) => {
+                      const active = musicGenreId === genre.id;
+                      return (
+                        <button
+                          key={genre.id}
+                          type="button"
+                          onClick={() => selectMusicGenre(genre.id)}
+                          title={genre.description}
+                          className={[
+                            "min-h-8 rounded-xl border px-2 text-xs font-black transition active:scale-[0.98]",
+                            active ? "border-[#FFB15D] bg-[#F0633C] text-white" : "border-[#73DFFF]/25 bg-[#151F41] text-[#D4F5FF]"
+                          ].join(" ")}
+                        >
+                          {genre.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 gap-2 rounded-2xl border border-[#73DFFF]/20 bg-[#0B1029]/72 p-2 sm:grid-cols-2">
                   <SecondaryButton onClick={generateCoverImage} disabled={Boolean(imageGenerationMode) || Boolean(sceneImages[0])}>
