@@ -305,7 +305,7 @@ function KioskArtwork({
       {guideText ? (
         <div className="absolute bottom-16 left-7 flex max-w-[calc(100%-56px)] items-end gap-3">
           <img
-            src="/images/buyeo-mascot-transparent.png"
+            src="/images/mori-mascot-transparent.png"
             alt=""
             aria-hidden="true"
             className="story-mascot-float h-28 w-28 shrink-0 object-contain drop-shadow-[0_18px_24px_rgba(0,0,0,0.3)] sm:h-32 sm:w-32"
@@ -927,7 +927,7 @@ export function StoryKioskApp() {
           <header className="z-10 mx-auto flex w-full max-w-[1180px] flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <img
-                src="/images/buyeo-mascot-transparent.png"
+                src="/images/mori-mascot-transparent.png"
                 alt=""
                 aria-hidden="true"
                 className="h-16 w-16 shrink-0 object-contain drop-shadow-[0_8px_14px_rgba(0,0,0,0.28)]"
@@ -1026,7 +1026,7 @@ export function StoryKioskApp() {
               <span aria-hidden="true" className="story-mascot-float relative mt-1 block h-[clamp(130px,16vw,210px)] w-[clamp(130px,16vw,210px)]">
                 <span className="absolute inset-x-[18%] bottom-1 h-8 rounded-full bg-[#050914]/55 blur-xl" />
                 <img
-                  src="/images/buyeo-mascot-transparent.png"
+                  src="/images/mori-mascot-transparent.png"
                   alt=""
                   className="relative h-full w-full object-contain drop-shadow-[0_24px_34px_rgba(0,0,0,0.36)]"
                   draggable={false}

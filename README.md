@@ -1,6 +1,6 @@
-# 부여 AI STORY
+# 모산 AI 동화 만들기
 
-부여 AI센터 키오스크 체험용 동화 만들기 앱입니다.
+모산초등학교 3~6학년 학생들이 태블릿으로 AI 동화책을 만드는 수업용 앱입니다.
 
 ## 주요 구성
 
@@ -8,7 +8,7 @@
 src/app/story/          /story 페이지
 src/story/              동화 만들기 UI, 데이터, 클라이언트 엔진
 story-proxy/            Gemini 프록시 서버
-public/images/          동화 앱 기본 이미지와 부여 캐릭터
+public/images/          동화 앱 기본 이미지와 모리 캐릭터
 install-buyeo-story.bat AI센터 PC 설치 스크립트
 start-buyeo-story.bat   키오스크 실행 스크립트
 stop-buyeo-story.bat    서버 종료 스크립트

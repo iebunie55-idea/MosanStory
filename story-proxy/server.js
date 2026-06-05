@@ -124,7 +124,7 @@ function buildImagePrompt(selection, scene, pageIndex) {
     `Character bible: ${palette[characterId] || palette.kong}. This is the single named protagonist. Keep the exact same species, face shape, eye color, body proportions, outfit, scarf/accessories, colors, and facial features on every page.`,
     "Do not redesign the protagonist between pages. Do not change the protagonist into a different animal, different age, different costume, or different color palette.",
     "Supporting characters may appear only when needed by the story, but keep them small and secondary. They must not distract from, replace, duplicate, or be confused with the protagonist.",
-    "Do not include the Buyeo mascot, logo character, watermark, text labels, captions, or any extra sticker-like overlay inside the generated illustration.",
+    "Do not include Mori, the app guide mascot, logos, watermark, text labels, captions, or any extra sticker-like overlay inside the generated illustration.",
     `Setting bible: ${settingBible[placeKey] || settingBible.village}. Keep the same world design, palette, lighting mood, and material style across pages.`,
     "Use a consistent square storybook composition: protagonist clearly visible in the foreground or middle ground, clear foreground action, soft background depth, no extreme camera angle changes, no cropping that makes the character unrecognizable.",
     `Scene number: ${Number(pageIndex) + 1} of 6. Only selected pages are illustrated automatically, and the final page must work as a satisfying ending image.`,

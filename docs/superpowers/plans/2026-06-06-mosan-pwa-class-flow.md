@@ -465,7 +465,7 @@ Create `public/manifest.webmanifest`:
   "orientation": "landscape-primary",
   "icons": [
     {
-      "src": "/images/buyeo-mascot.png",
+      "src": "/images/mori-mascot.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
