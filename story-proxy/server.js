@@ -113,8 +113,8 @@ function buildImagePrompt(selection, scene, pageIndex) {
     island: "dreamlike island, turquoise water, round rocks, colorful flowers, soft clouds",
     sea: "sparkling underwater world, coral gardens, bubbles, gentle blue light",
     cloud: "castle above the clouds, soft white cloud bridges, pearl towers, pastel sky",
-    baekma: "Baekma River inspired riverside in Buyeo, gentle water, reeds, warm historic atmosphere",
-    gungnamji: "Gungnamji pond inspired garden in Buyeo, lotus flowers, calm water, elegant pavilion"
+    hyeonchungsa: "Hyeonchungsa shrine in Asan, quiet historic Korean memorial grounds, traditional tiled buildings, pine trees, respectful warm atmosphere",
+    oeam: "Oeam Folk Village in Asan, traditional Korean hanok houses, stone walls, old village paths, gentle rural heritage atmosphere"
   };
 
   return [

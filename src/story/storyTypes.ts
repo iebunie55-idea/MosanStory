@@ -15,6 +15,7 @@ export type PlaceChoice = {
   name: string;
   sceneKey: string;
   color: string;
+  imageSrc: string;
 };
 
 export type StorySelection = {

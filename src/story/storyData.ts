@@ -19,13 +19,13 @@ export const traits: Choice[] = [
 ];
 
 export const places: PlaceChoice[] = [
-  { id: "village", name: "평화로운 마을", sceneKey: "village", color: "#1F8A74" },
-  { id: "forest", name: "요정의 숲", sceneKey: "forest", color: "#4AA66B" },
-  { id: "island", name: "환상적인 섬", sceneKey: "island", color: "#4CA7D8" },
-  { id: "sea", name: "반짝이는 바닷속", sceneKey: "sea", color: "#2386C8" },
-  { id: "cloud", name: "구름 위의 성", sceneKey: "cloud", color: "#8E9CE8" },
-  { id: "baekma", name: "백마강 가", sceneKey: "baekma", color: "#2D9C8C" },
-  { id: "gungnamji", name: "궁남지", sceneKey: "gungnamji", color: "#D989A6" }
+  { id: "village", name: "평화로운 마을", sceneKey: "village", color: "#1F8A74", imageSrc: "/images/places/village.png" },
+  { id: "forest", name: "요정의 숲", sceneKey: "forest", color: "#4AA66B", imageSrc: "/images/places/forest.png" },
+  { id: "island", name: "환상적인 섬", sceneKey: "island", color: "#4CA7D8", imageSrc: "/images/places/island.png" },
+  { id: "sea", name: "반짝이는 바닷속", sceneKey: "sea", color: "#2386C8", imageSrc: "/images/places/sea.png" },
+  { id: "cloud", name: "구름 위의 성", sceneKey: "cloud", color: "#8E9CE8", imageSrc: "/images/places/cloud.png" },
+  { id: "hyeonchungsa", name: "현충사", sceneKey: "hyeonchungsa", color: "#2D9C8C", imageSrc: "/images/places/hyeonchungsa.png" },
+  { id: "oeam", name: "외암민속마을", sceneKey: "oeam", color: "#D989A6", imageSrc: "/images/places/oeam.png" }
 ];
 
 export const eventGroups = {
