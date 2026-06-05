@@ -934,7 +934,6 @@ export function StoryKioskApp() {
                 draggable={false}
               />
               <div>
-                <p className="text-base font-black tracking-[0.08em] text-[#7DFFD4]">[{schoolLabel}]</p>
                 <h1 className="mt-1 text-2xl font-black text-white drop-shadow-[0_0_16px_rgba(125,232,255,0.32)] sm:text-3xl">
                   AI와 함께 만드는 나만의 동화책
                 </h1>
@@ -956,9 +955,6 @@ export function StoryKioskApp() {
           <div className="z-10 grid min-h-0 place-items-center px-3 py-5 text-center">
             <div className="grid w-full max-w-[980px] gap-6 rounded-[34px] border-2 border-[#73DFFF]/35 bg-[#101A38]/82 px-6 py-8 shadow-[0_0_42px_rgba(36,77,255,0.28)] backdrop-blur sm:px-10">
               <div className="grid gap-3">
-                <p className="text-[clamp(18px,2vw,30px)] font-black tracking-[0.12em] text-[#7DFFD4]">
-                  {schoolLabel}
-                </p>
                 <h1 className="text-[clamp(42px,6vw,86px)] font-black leading-tight text-white drop-shadow-[0_0_28px_rgba(125,232,255,0.35)]">
                   AI와 함께 나만의 동화책 만들기
                 </h1>
@@ -1011,9 +1007,6 @@ export function StoryKioskApp() {
               <span className="pointer-events-none absolute bottom-[22%] right-[20%] h-4 w-4 rotate-45 bg-[#7DFFD4] shadow-[0_0_22px_rgba(125,255,212,0.68)]" />
 
               <span className="flex flex-col items-center gap-2">
-                <span className="text-[clamp(18px,2.2vw,34px)] font-black tracking-[0.14em] text-[#7DFFD4] drop-shadow-[0_0_14px_rgba(125,255,212,0.34)]">
-                  [{schoolLabel}]
-                </span>
                 <span className="text-[clamp(26px,3.4vw,52px)] font-black leading-tight text-white drop-shadow-[0_0_20px_rgba(125,232,255,0.28)]">
                   AI와 함께 만드는 나만의 동화책
                 </span>
