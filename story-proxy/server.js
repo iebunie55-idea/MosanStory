@@ -21,6 +21,46 @@ const geminiThinkingBudget = Number(process.env.GEMINI_THINKING_BUDGET ?? 0);
 const rateBuckets = new Map();
 const classAccess = createClassAccessStore();
 
+// 동시 이미지 생성 요청 수를 제한해 Gemini RPM 초과를 방지
+const MAX_CONCURRENT_IMAGE = 3;
+const MAX_QUEUE_SIZE = 12;
+let activeImageCount = 0;
+const imageQueue = [];
+
+function acquireImageSlot(timeoutMs = 30000) {
+  return new Promise((resolve, reject) => {
+    if (activeImageCount >= MAX_CONCURRENT_IMAGE && imageQueue.length >= MAX_QUEUE_SIZE) {
+      return reject(new Error("image_queue_full"));
+    }
+
+    const release = () => {
+      activeImageCount--;
+      const next = imageQueue.shift();
+      if (next) next();
+    };
+
+    let timer = null;
+
+    const activate = () => {
+      clearTimeout(timer);
+      activeImageCount++;
+      resolve(release);
+    };
+
+    if (activeImageCount < MAX_CONCURRENT_IMAGE) {
+      return activate();
+    }
+
+    timer = setTimeout(() => {
+      const idx = imageQueue.indexOf(activate);
+      if (idx >= 0) imageQueue.splice(idx, 1);
+      reject(new Error("image_queue_timeout"));
+    }, timeoutMs);
+
+    imageQueue.push(activate);
+  });
+}
+
 app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: "64kb" }));
 
@@ -272,6 +312,20 @@ async function callGeminiImage(prompt) {
   return extractGeminiImageResult(data);
 }
 
+async function callGeminiImageWithRetry(prompt) {
+  try {
+    return await callGeminiImage(prompt);
+  } catch (error) {
+    const msg = String(error?.message || "").toLowerCase();
+    if (msg.includes("429") || msg.includes("quota") || msg.includes("rate")) {
+      console.warn("Gemini image 429 — 3초 후 재시도");
+      await new Promise((r) => setTimeout(r, 3000));
+      return callGeminiImage(prompt);
+    }
+    throw error;
+  }
+}
+
 function validateSelection(selection) {
   return Boolean(
     selection &&
@@ -381,14 +435,27 @@ app.post("/api/image", async (req, res) => {
     return res.status(403).json({ error: "class_access_denied", ...access });
   }
 
+  let release;
+  try {
+    release = await acquireImageSlot(30000);
+  } catch {
+    return res.status(429).json({
+      error: "image_quota_exceeded",
+      message: "이미지 생성 요청이 많아요. 잠시 뒤 다시 눌러 주세요.",
+      retryAfterSeconds: 15
+    });
+  }
+
   try {
     const prompt = buildImagePrompt(selection, scene, pageIndex);
-    const { b64, mimeType } = await callGeminiImage(prompt);
+    const { b64, mimeType } = await callGeminiImageWithRetry(prompt);
     return res.json({ imageBase64: b64, mimeType, prompt, provider: "gemini", model: geminiImageModel });
   } catch (error) {
     console.error(error);
     const response = toProviderErrorResponse(error, "image_provider_failed");
     return res.status(response.statusCode).json(response.body);
+  } finally {
+    if (release) release();
   }
 });
 
