@@ -13,7 +13,14 @@ import {
 } from "@heroicons/react/24/solid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildStoryPdfMetadata } from "./pdfMetadata";
-import { classSessionStorageKey, normalizeClassId } from "./classSession";
+import {
+  classSessionStorageKey,
+  createClassSessionToken,
+  isAllowedClassId,
+  normalizeClassId,
+  requestClassLogin,
+  resetClassAccess
+} from "./classSession";
 import { getKioskArtworkSource } from "./storyArtwork";
 import { characters, eventGroups, places, traits } from "./storyData";
 import { checkProxyHealth, generateSceneImage, generateStory, localStory } from "./storyEngine";
@@ -130,12 +137,14 @@ function readClassSession() {
   return null;
 }
 
-function writeClassSession(classId: string) {
-  const current = readClassSession();
-  const sessionToken = current?.classId === classId ? current.sessionToken : `mosan-device-${Date.now()}`;
+function writeClassSession(classId: string, sessionToken: string) {
   const next = { classId, sessionToken };
   window.localStorage.setItem(classSessionStorageKey, JSON.stringify(next));
   return next;
+}
+
+function clearClassSession() {
+  window.localStorage.removeItem(classSessionStorageKey);
 }
 
 function formatSavedStoryDate(value: string) {
@@ -621,7 +630,12 @@ export function StoryKioskApp() {
   const [step, setStep] = useState<Step>("login");
   const [classIdInput, setClassIdInput] = useState("");
   const [classId, setClassId] = useState("");
+  const [classSessionToken, setClassSessionToken] = useState("");
   const [classLoginMessage, setClassLoginMessage] = useState("");
+  const [classLoginPending, setClassLoginPending] = useState(false);
+  const [classResetCode, setClassResetCode] = useState("");
+  const [classResetMessage, setClassResetMessage] = useState("");
+  const [classResetPending, setClassResetPending] = useState(false);
   const [character, setCharacter] = useState<CharacterChoice>(defaultCharacter);
   const [trait, setTrait] = useState<Choice>(defaultTrait);
   const [place, setPlace] = useState<PlaceChoice>(defaultPlace);
@@ -653,8 +667,7 @@ export function StoryKioskApp() {
   const [customError, setCustomError] = useState("");
   const [musicState, setMusicState] = useState<StoryMusicState>("paused");
   const [musicGenreId, setMusicGenreId] = useState<StoryMusicGenreId>(defaultMusicGenreId);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const musicIntervalRef = useRef<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   // 자동 생성 대상 4장면: 시작, 발단, 절정, 결말
   const IMAGE_PAGES = [0, 1, 3, 5] as const;
 
@@ -688,59 +701,24 @@ export function StoryKioskApp() {
   }, [activeSavedStoryId, persistSavedStories]);
 
   const stopStoryMusic = useCallback(() => {
-    if (musicIntervalRef.current) {
-      window.clearInterval(musicIntervalRef.current);
-      musicIntervalRef.current = null;
-    }
+    if (!audioRef.current) return;
 
-    void audioContextRef.current?.close();
-    audioContextRef.current = null;
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+    audioRef.current = null;
   }, []);
-
-  const playTone = useCallback((frequency: number, duration: number, gainValue: number, waveform: OscillatorType) => {
-    const context = audioContextRef.current;
-    if (!context) return;
-
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = waveform;
-    oscillator.frequency.setValueAtTime(frequency, context.currentTime);
-    gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(gainValue, context.currentTime + 0.12);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + duration + 0.04);
-  }, []);
-
-  const playMusicPhrase = useCallback((genre: StoryMusicGenre, phraseIndex: number) => {
-    const chord = genre.chords[phraseIndex % genre.chords.length] || genre.chords[0] || [];
-    const melody = genre.melody[phraseIndex % genre.melody.length];
-
-    chord.forEach((frequency) => {
-      playTone(frequency, genre.chordDuration, genre.padGain * genre.masterGain, genre.padWaveform);
-    });
-
-    if (melody) {
-      playTone(melody, genre.melodyDuration, genre.melodyGain * genre.masterGain, genre.waveform);
-    }
-  }, [playTone]);
 
   const startStoryMusic = useCallback((genre: StoryMusicGenre = selectedMusicGenre) => {
-    const AudioContextConstructor =
-      window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextConstructor) return;
-
     stopStoryMusic();
-    audioContextRef.current = new AudioContextConstructor();
-    let index = 0;
-    playMusicPhrase(genre, index);
-    musicIntervalRef.current = window.setInterval(() => {
-      index += 1;
-      playMusicPhrase(genre, index);
-    }, genre.intervalMs);
-  }, [playMusicPhrase, selectedMusicGenre, stopStoryMusic]);
+    const audio = new Audio(genre.audioSrc);
+    audio.loop = true;
+    audio.volume = genre.volume;
+    audioRef.current = audio;
+    void audio.play().catch(() => {
+      setMusicState("paused");
+      stopStoryMusic();
+    });
+  }, [selectedMusicGenre, stopStoryMusic]);
 
   function toggleStoryMusic() {
     const nextState = nextMusicState(musicState);
@@ -767,18 +745,54 @@ export function StoryKioskApp() {
     setPageIndex(0);
   }, [stopStoryMusic]);
 
-  function enterClassSession() {
+  async function enterClassSession() {
     const normalized = normalizeClassId(classIdInput);
-    if (!/^mosan-\d{3}$/.test(normalized)) {
-      setClassLoginMessage("아이디는 예: mosan-001 처럼 입력해 주세요.");
+    if (!isAllowedClassId(normalized)) {
+      setClassLoginMessage("아이디는 mosan-001부터 mosan-030까지만 사용할 수 있어요.");
       return;
     }
 
-    writeClassSession(normalized);
-    setClassId(normalized);
-    setClassIdInput(normalized);
-    setClassLoginMessage("좋아요. 이제 나만의 동화책을 만들어요.");
+    const currentSession = readClassSession();
+    const sessionToken = currentSession?.classId === normalized ? currentSession.sessionToken : createClassSessionToken();
+    setClassLoginPending(true);
+    setClassLoginMessage("아이디를 확인하고 있어요.");
+    const result = await requestClassLogin(normalized, sessionToken);
+    setClassLoginPending(false);
+
+    if (!result.ok || !result.classId || !result.sessionToken) {
+      setClassLoginMessage(result.message);
+      return;
+    }
+
+    writeClassSession(result.classId, result.sessionToken);
+    setClassId(result.classId);
+    setClassSessionToken(result.sessionToken);
+    setClassIdInput(result.classId);
+    setClassLoginMessage(result.message);
     setStep("attract");
+  }
+
+  async function resetClassIdsForNextClass() {
+    const resetCode = classResetCode.trim();
+    if (!resetCode) {
+      setClassResetMessage("초기화 코드를 입력해 주세요.");
+      return;
+    }
+
+    setClassResetPending(true);
+    setClassResetMessage("수업 아이디를 초기화하고 있어요.");
+    const result = await resetClassAccess(resetCode);
+    setClassResetPending(false);
+    setClassResetMessage(result.message);
+
+    if (result.ok) {
+      clearClassSession();
+      setClassId("");
+      setClassSessionToken("");
+      setClassIdInput("");
+      setClassLoginMessage("다음 반 수업을 시작할 수 있어요.");
+      setStep("login");
+    }
   }
 
   function openSavedStory(savedStory: SavedStory) {
@@ -800,6 +814,7 @@ export function StoryKioskApp() {
     if (session) {
       setClassId(session.classId);
       setClassIdInput(session.classId);
+      setClassSessionToken(session.sessionToken);
       setStep("attract");
     }
   }, []);
@@ -836,7 +851,7 @@ export function StoryKioskApp() {
     setPageIndex(0);
     setSceneImages({});
     setImageGenerationMode(null);
-    const result = await generateStory(storySelection);
+    const result = await generateStory(storySelection, { classId, sessionToken: classSessionToken });
     setStory(result);
     setActiveSavedStoryId(storyId);
     persistSavedStories((current) => [
@@ -868,7 +883,7 @@ export function StoryKioskApp() {
         const scene = story.pages[index];
         if (!scene) continue;
 
-        const image = await generateSceneImage(selection, scene, index);
+        const image = await generateSceneImage(selection, scene, index, mode, { classId, sessionToken: classSessionToken });
         if (image) {
           nextImages = { ...nextImages, [index]: image.imageDataUrl };
           setSceneImages(nextImages);
@@ -1060,14 +1075,38 @@ export function StoryKioskApp() {
                   <button
                     type="button"
                     onClick={enterClassSession}
-                    className="min-h-16 rounded-2xl border-2 border-[#FFB15D] bg-[#F0633C] px-6 text-lg font-black text-white shadow-[0_0_24px_rgba(240,99,60,0.26)] active:scale-[0.98]"
+                    disabled={classLoginPending}
+                    className="min-h-16 rounded-2xl border-2 border-[#FFB15D] bg-[#F0633C] px-6 text-lg font-black text-white shadow-[0_0_24px_rgba(240,99,60,0.26)] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#6B5C72]"
                   >
-                    시작
+                    {classLoginPending ? "확인 중" : "시작"}
                   </button>
                 </div>
                 <p className="min-h-6 text-sm font-black text-[#FFD073]">
                   {classLoginMessage || "아이디를 입력하면 동화 만들기 화면으로 들어가요."}
                 </p>
+                <div className="mt-1 grid gap-2 border-t border-[#73DFFF]/15 pt-3">
+                  <p className="text-xs font-black text-[#D4F5FF]">선생님 수업 초기화</p>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <input
+                      value={classResetCode}
+                      onChange={(event) => setClassResetCode(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") resetClassIdsForNextClass();
+                      }}
+                      placeholder="초기화 코드"
+                      className="min-h-11 min-w-0 rounded-xl border border-[#73DFFF]/25 bg-[#151F41] px-3 text-sm font-black text-white outline-none placeholder:text-[#D4F5FF]/45 focus:border-[#FFB15D]"
+                    />
+                    <button
+                      type="button"
+                      onClick={resetClassIdsForNextClass}
+                      disabled={classResetPending}
+                      className="min-h-11 rounded-xl border border-[#73DFFF]/35 bg-[#101A38] px-3 text-sm font-black text-[#DDFBFF] active:scale-[0.98] disabled:cursor-not-allowed disabled:text-[#D4F5FF]/45"
+                    >
+                      {classResetPending ? "초기화 중" : "초기화"}
+                    </button>
+                  </div>
+                  <p className="min-h-5 text-xs font-black text-[#7DFFD4]">{classResetMessage}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -1303,7 +1342,7 @@ export function StoryKioskApp() {
                       <MusicalNoteIcon className="h-4 w-4" /> {musicState === "playing" ? "정지" : "재생"}
                     </button>
                   </div>
-                  <div className="grid grid-cols-5 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
                     {musicGenres.map((genre) => {
                       const active = musicGenreId === genre.id;
                       return (

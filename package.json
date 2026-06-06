@@ -8,7 +8,7 @@
     "start": "next start",
     "serve:out": "serve out -l tcp://127.0.0.1:3000",
     "lint": "next lint",
-    "test": "vitest run",
+    "test": "vitest run src",
     "test:watch": "vitest"
   },
   "dependencies": {

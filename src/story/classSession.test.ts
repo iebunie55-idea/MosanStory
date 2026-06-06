@@ -1,10 +1,19 @@
 import { describe, expect, test } from "vitest";
-import { classSessionStorageKey, decideClassLogin, normalizeClassId } from "./classSession";
+import { classSessionStorageKey, decideClassLogin, isAllowedClassId, normalizeClassId } from "./classSession";
 
 describe("normalizeClassId", () => {
   test("normalizes Mosan class IDs for young students typing on tablets", () => {
     expect(normalizeClassId(" MOSAN-001 ")).toBe("mosan-001");
     expect(normalizeClassId("mosan001")).toBe("mosan-001");
+  });
+});
+
+describe("isAllowedClassId", () => {
+  test("allows only the 30 reusable classroom IDs", () => {
+    expect(isAllowedClassId("mosan-001")).toBe(true);
+    expect(isAllowedClassId("mosan-030")).toBe(true);
+    expect(isAllowedClassId("mosan-031")).toBe(false);
+    expect(isAllowedClassId("mosan-000")).toBe(false);
   });
 });
 

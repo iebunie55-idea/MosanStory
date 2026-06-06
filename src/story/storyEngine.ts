@@ -2,6 +2,10 @@ import type { StoryResult, StorySelection } from "./storyTypes";
 
 const PROXY_URL =
   process.env.NEXT_PUBLIC_STORY_PROXY_URL?.replace(/\/$/, "") || "http://localhost:3001";
+type ClassAccessPayload = {
+  classId?: string;
+  sessionToken?: string;
+};
 
 function hasFinalConsonant(text: string) {
   const last = text.trim().charCodeAt(text.trim().length - 1);
@@ -102,14 +106,14 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
-export async function generateStory(selection: StorySelection): Promise<StoryResult> {
+export async function generateStory(selection: StorySelection, access: ClassAccessPayload = {}): Promise<StoryResult> {
   try {
     const response = await fetchWithTimeout(
       `${PROXY_URL}/api/story`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selection })
+        body: JSON.stringify({ selection, ...access })
       },
       20000
     );
@@ -136,7 +140,9 @@ export async function generateStory(selection: StorySelection): Promise<StoryRes
 export async function generateSceneImage(
   selection: StorySelection,
   scene: string,
-  pageIndex: number
+  pageIndex: number,
+  mode: "cover" | "print" = "cover",
+  access: ClassAccessPayload = {}
 ): Promise<{ imageDataUrl: string; prompt: string } | null> {
   try {
     const response = await fetchWithTimeout(
@@ -144,7 +150,7 @@ export async function generateSceneImage(
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selection, scene, pageIndex })
+        body: JSON.stringify({ selection, scene, pageIndex, mode, ...access })
       },
       45000
     );

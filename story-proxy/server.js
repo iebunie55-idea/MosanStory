@@ -1,6 +1,7 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import { createClassAccessStore } from "./classAccess.js";
 
 dotenv.config();
 
@@ -8,12 +9,17 @@ const app = express();
 const port = Number(process.env.PORT || 3001);
 const providerName = (process.env.PROVIDER || "gemini").toLowerCase();
 const maxPerMinute = Number(process.env.MAX_PER_MIN || 20);
+const classResetCode = process.env.CLASS_RESET_CODE || "mosan-reset";
+const corsOrigin = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean)
+  : true;
 // Gemini 네이티브 이미지 생성 (무료 티어 지원)
 const geminiImageModel = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
 const geminiThinkingBudget = Number(process.env.GEMINI_THINKING_BUDGET ?? 0);
 const rateBuckets = new Map();
+const classAccess = createClassAccessStore();
 
-app.use(cors({ origin: true }));
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: "64kb" }));
 
 const providers = {
@@ -305,6 +311,27 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.post("/api/class-login", (req, res) => {
+  const result = classAccess.login({
+    classId: req.body?.classId,
+    sessionToken: req.body?.sessionToken
+  });
+
+  return res.status(result.ok ? 200 : 403).json(result);
+});
+
+app.post("/api/class-reset", (req, res) => {
+  if (String(req.body?.resetCode || "") !== classResetCode) {
+    return res.status(403).json({
+      ok: false,
+      reason: "invalid_reset_code",
+      message: "초기화 코드를 확인해 주세요."
+    });
+  }
+
+  return res.json(classAccess.reset());
+});
+
 app.post("/api/story", async (req, res) => {
   if (isRateLimited(req.ip)) {
     return res.status(429).json({ error: "rate_limited" });
@@ -318,6 +345,15 @@ app.post("/api/story", async (req, res) => {
   const selection = req.body?.selection;
   if (!validateSelection(selection)) {
     return res.status(400).json({ error: "invalid_selection" });
+  }
+
+  const access = classAccess.consumeUsage({
+    classId: req.body?.classId,
+    sessionToken: req.body?.sessionToken,
+    kind: "story"
+  });
+  if (!access.ok) {
+    return res.status(403).json({ error: "class_access_denied", ...access });
   }
 
   try {
@@ -343,9 +379,19 @@ app.post("/api/image", async (req, res) => {
   const selection = req.body?.selection;
   const scene = req.body?.scene;
   const pageIndex = Number(req.body?.pageIndex || 0);
+  const mode = req.body?.mode === "print" ? "printImage" : "coverImage";
 
   if (!validateSelection(selection) || typeof scene !== "string" || !scene.trim()) {
     return res.status(400).json({ error: "invalid_image_request" });
+  }
+
+  const access = classAccess.consumeUsage({
+    classId: req.body?.classId,
+    sessionToken: req.body?.sessionToken,
+    kind: mode
+  });
+  if (!access.ok) {
+    return res.status(403).json({ error: "class_access_denied", ...access });
   }
 
   try {

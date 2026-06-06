@@ -12,23 +12,28 @@ describe("nextMusicState", () => {
 });
 
 describe("musicGenres", () => {
-  test("recommends five classroom-friendly genres", () => {
-    expect(musicGenres.map((genre) => genre.label)).toEqual(["모험", "신비", "평온", "명랑", "감동"]);
+  test("uses the six attached classroom music files", () => {
+    expect(musicGenres.map((genre) => genre.audioSrc)).toEqual([
+      "/images/Brave%20Little%20Quest.mp3",
+      "/images/Clouds%20of%20Gold.mp3",
+      "/images/Moonlit%20Acorn.mp3",
+      "/images/Moonlit%20Cradle.mp3",
+      "/images/Morning%20Sprout.mp3",
+      "/images/Clouds%20of%20Gold1.mp3"
+    ]);
   });
 
-  test("uses calm music as the default reading-friendly genre", () => {
+  test("uses Moonlit Cradle as the default reading-friendly track", () => {
     const genre = getMusicGenre(defaultMusicGenreId);
 
-    expect(genre.label).toBe("평온");
-    expect(genre.melody.length).toBeGreaterThanOrEqual(4);
-    expect(genre.intervalMs).toBeGreaterThan(700);
+    expect(genre.label).toBe("달빛자장");
+    expect(genre.audioSrc).toBe("/images/Moonlit%20Cradle.mp3");
   });
 
-  test("uses layered chords and melody notes for softer generated background music", () => {
+  test("keeps every track quiet enough for story reading", () => {
     for (const genre of musicGenres) {
-      expect(genre.chords.length).toBeGreaterThanOrEqual(2);
-      expect(genre.melody.length).toBeGreaterThanOrEqual(4);
-      expect(genre.masterGain).toBeLessThanOrEqual(0.045);
+      expect(genre.volume).toBeGreaterThan(0);
+      expect(genre.volume).toBeLessThanOrEqual(0.55);
     }
   });
 });
