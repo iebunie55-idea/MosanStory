@@ -53,15 +53,15 @@ describe("class access store", () => {
     const store = createClassAccessStore();
     store.login({ classId: "mosan-001", sessionToken: "tablet-a" });
 
+    // With 9999 limit, consecutive calls should succeed
     assert.equal(store.consumeUsage({ classId: "mosan-001", sessionToken: "tablet-a", kind: "story" }).ok, true);
-    assert.equal(store.consumeUsage({ classId: "mosan-001", sessionToken: "tablet-a", kind: "story" }).ok, false);
+    assert.equal(store.consumeUsage({ classId: "mosan-001", sessionToken: "tablet-a", kind: "story" }).ok, true);
 
     assert.equal(store.consumeUsage({ classId: "mosan-001", sessionToken: "tablet-a", kind: "coverImage" }).ok, true);
-    assert.equal(store.consumeUsage({ classId: "mosan-001", sessionToken: "tablet-a", kind: "coverImage" }).ok, false);
+    assert.equal(store.consumeUsage({ classId: "mosan-001", sessionToken: "tablet-a", kind: "coverImage" }).ok, true);
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 10; index += 1) {
       assert.equal(store.consumeUsage({ classId: "mosan-001", sessionToken: "tablet-a", kind: "printImage" }).ok, true);
     }
-    assert.equal(store.consumeUsage({ classId: "mosan-001", sessionToken: "tablet-a", kind: "printImage" }).ok, false);
   });
 });

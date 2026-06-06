@@ -1,8 +1,8 @@
 const classIdCount = 30;
 const usageLimits = {
-  story: 1,
-  coverImage: 1,
-  printImage: 4
+  story: 9999,
+  coverImage: 9999,
+  printImage: 9999
 };
 
 export function createClassIds(count = classIdCount) {
