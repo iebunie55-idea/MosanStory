@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { classSessionStorageKey, decideClassLogin, isAllowedClassId, normalizeClassId } from "./classSession";
+import { classSessionStorageKey, createClassIdChangeState, decideClassLogin, isAllowedClassId, normalizeClassId } from "./classSession";
 
 describe("normalizeClassId", () => {
   test("normalizes Mosan class IDs for young students typing on tablets", () => {
@@ -50,5 +50,16 @@ describe("decideClassLogin", () => {
 describe("classSessionStorageKey", () => {
   test("uses a stable storage key for the class session token", () => {
     expect(classSessionStorageKey).toBe("mosan-story.classSession.v1");
+  });
+});
+
+describe("createClassIdChangeState", () => {
+  test("clears the local tablet session and prompts for another class ID", () => {
+    expect(createClassIdChangeState()).toEqual({
+      classId: "",
+      classSessionToken: "",
+      classIdInput: "",
+      classLoginMessage: "다른 수업 아이디를 입력해 주세요."
+    });
   });
 });

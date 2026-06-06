@@ -16,6 +16,15 @@ export const classSessionStorageKey = "mosan-story.classSession.v1";
 export const classSessionResetCodeStorageKey = "mosan-story.classResetCode.v1";
 const storyProxyUrl = process.env.NEXT_PUBLIC_STORY_PROXY_URL?.replace(/\/$/, "") || "http://localhost:3001";
 
+export function createClassIdChangeState() {
+  return {
+    classId: "",
+    classSessionToken: "",
+    classIdInput: "",
+    classLoginMessage: "다른 수업 아이디를 입력해 주세요."
+  };
+}
+
 export function normalizeClassId(value: string) {
   const compact = value.trim().toLowerCase().replace(/\s+/g, "");
   const match = compact.match(/^mosan-?(\d{1,3})$/);

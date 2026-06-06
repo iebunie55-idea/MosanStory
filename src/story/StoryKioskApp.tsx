@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildStoryPdfMetadata } from "./pdfMetadata";
 import {
   classSessionStorageKey,
+  createClassIdChangeState,
   createClassSessionToken,
   isAllowedClassId,
   normalizeClassId,
@@ -747,6 +748,21 @@ export function StoryKioskApp() {
     setPageIndex(0);
   }, [stopStoryMusic]);
 
+  const changeClassId = useCallback(() => {
+    stopStoryMusic();
+    clearClassSession();
+    const next = createClassIdChangeState();
+    setMusicState("paused");
+    setClassId(next.classId);
+    setClassSessionToken(next.classSessionToken);
+    setClassIdInput(next.classIdInput);
+    setClassLoginMessage(next.classLoginMessage);
+    setClassResetMessage("");
+    setImageGenerationMessage("");
+    setPageIndex(0);
+    setStep("login");
+  }, [stopStoryMusic]);
+
   async function enterClassSession() {
     const normalized = normalizeClassId(classIdInput);
     if (!isAllowedClassId(normalized)) {
@@ -1118,7 +1134,7 @@ export function StoryKioskApp() {
             </div>
           </div>
         ) : step === "attract" ? (
-          <div className="z-10 grid min-h-0 overflow-hidden">
+          <div className="relative z-10 grid min-h-0 overflow-hidden">
           <button
             type="button"
             onClick={() => setStep("character")}
@@ -1157,6 +1173,15 @@ export function StoryKioskApp() {
 
             </span>
           </button>
+          {classId ? (
+            <button
+              type="button"
+              onClick={changeClassId}
+              className="absolute bottom-8 right-10 z-20 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#73DFFF]/45 bg-[#101A38]/86 px-4 text-sm font-black text-[#DDFBFF] shadow-[0_0_18px_rgba(125,232,255,0.16)] active:scale-[0.98]"
+            >
+              <ArrowPathIcon className="h-4 w-4" /> 다른 아이디로 로그인
+            </button>
+          ) : null}
           </div>
         ) : (
         <div className={["z-10 mx-auto grid h-full min-h-0 w-full max-w-[1560px] overflow-hidden", step === "result" ? "grid-rows-[minmax(0,1fr)_auto] gap-2" : "grid-rows-1"].join(" ")}>
