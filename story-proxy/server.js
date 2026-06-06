@@ -2,6 +2,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import { createClassAccessStore } from "./classAccess.js";
+import { buildGeminiImageRequest, extractGeminiImageResult } from "./geminiImage.js";
 
 dotenv.config();
 
@@ -265,24 +266,9 @@ async function callGeminiImage(prompt) {
   const key = providers.gemini.key;
   if (!key) throw new Error("GEMINI_API_KEY not set");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiImageModel}:generateContent?key=${key}`;
-  const data = await fetchJson(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseModalities: ["IMAGE"] }
-    })
-  }, 45000);
-
-  const parts = data.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts.find((p) => p.inlineData?.mimeType?.startsWith("image/"));
-
-  if (!imagePart?.inlineData?.data) {
-    throw new Error(`이미지 없음: ${JSON.stringify(data).slice(0, 300)}`);
-  }
-
-  return { b64: imagePart.inlineData.data, mimeType: imagePart.inlineData.mimeType };
+  const request = buildGeminiImageRequest({ model: geminiImageModel, key, prompt });
+  const data = await fetchJson(request.url, request.options, 45000);
+  return extractGeminiImageResult(data);
 }
 
 function validateSelection(selection) {
