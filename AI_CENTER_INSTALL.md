@@ -74,5 +74,5 @@ logs\proxy.log
 
 - 체험 PC 재부팅 시 자동으로 앱과 Chrome 키오스크가 실행됩니다.
 - 설치 후에는 `npm run build`가 완료되어야 `start-buyeo-story.bat`가 정상 실행됩니다.
-- 이 프로젝트는 `output: "export"` 설정을 사용하므로 실행 시 `next start`가 아니라 `serve out` 방식으로 정적 export 결과물을 실행합니다.
+- 운영 실행은 Vercel과 동일하게 `next start` 방식을 사용합니다.
 - 포트는 기본적으로 `3000`과 `3001`을 사용합니다.

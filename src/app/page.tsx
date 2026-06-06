@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { StoryClient } from "./story/StoryClient";
 
 export default function Home() {
-  redirect("/story");
+  return <StoryClient />;
 }

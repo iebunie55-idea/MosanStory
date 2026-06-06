@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: mosan-story-proxy
+    runtime: node
+    rootDir: story-proxy
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: PROVIDER
+        value: gemini
+      - key: MAX_PER_MIN
+        value: "20"
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GEMINI_IMAGE_MODEL
+        value: gemini-2.5-flash-image
+      - key: GEMINI_THINKING_BUDGET
+        value: "0"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CLASS_RESET_CODE
+        sync: false

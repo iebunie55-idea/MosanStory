@@ -1,7 +1,12 @@
 import type { StoryResult, StorySelection } from "./storyTypes";
+import { imageGenerationFailureMessage, type ImageGenerationResult } from "./imageGeneration";
 
 const PROXY_URL =
   process.env.NEXT_PUBLIC_STORY_PROXY_URL?.replace(/\/$/, "") || "http://localhost:3001";
+type ClassAccessPayload = {
+  classId?: string;
+  sessionToken?: string;
+};
 
 function hasFinalConsonant(text: string) {
   const last = text.trim().charCodeAt(text.trim().length - 1);
@@ -102,16 +107,16 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
-export async function generateStory(selection: StorySelection): Promise<StoryResult> {
+export async function generateStory(selection: StorySelection, access: ClassAccessPayload = {}): Promise<StoryResult> {
   try {
     const response = await fetchWithTimeout(
       `${PROXY_URL}/api/story`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selection })
+        body: JSON.stringify({ selection, ...access })
       },
-      10000
+      20000
     );
 
     if (!response.ok) {
@@ -136,21 +141,28 @@ export async function generateStory(selection: StorySelection): Promise<StoryRes
 export async function generateSceneImage(
   selection: StorySelection,
   scene: string,
-  pageIndex: number
-): Promise<{ imageDataUrl: string; prompt: string } | null> {
+  pageIndex: number,
+  mode: "cover" | "print" = "cover",
+  access: ClassAccessPayload = {}
+): Promise<ImageGenerationResult | null> {
   try {
     const response = await fetchWithTimeout(
       `${PROXY_URL}/api/image`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selection, scene, pageIndex })
+        body: JSON.stringify({ selection, scene, pageIndex, mode, ...access })
       },
       45000
     );
 
     if (!response.ok) {
-      throw new Error("image proxy failed");
+      const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
+      const error = data.error || "image_provider_failed";
+      return {
+        error,
+        message: data.message || imageGenerationFailureMessage(error)
+      };
     }
 
     const data = (await response.json()) as { imageBase64?: string; mimeType?: string; prompt?: string };
@@ -163,7 +175,10 @@ export async function generateSceneImage(
       prompt: data.prompt || ""
     };
   } catch {
-    return null;
+    return {
+      error: "image_provider_failed",
+      message: imageGenerationFailureMessage("image_provider_failed")
+    };
   }
 }
 

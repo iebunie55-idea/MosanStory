@@ -25,6 +25,8 @@ Set `PROVIDER` to one of:
 
 Fill only the API key for the selected provider. The kiosk app reads from `NEXT_PUBLIC_STORY_PROXY_URL`; when unset, it uses `http://localhost:3001`.
 
+For production, set `CORS_ORIGIN` to the deployed app URL so only the classroom app can call this proxy.
+
 ## Endpoints
 
 - `GET /api/health` returns `{ ok, provider, model, keyLoaded }`.
@@ -34,13 +36,11 @@ If the proxy fails, the browser app falls back to the built-in story engine.
 
 ## Image generation
 
-`POST /api/image` generates one image for the current story scene. It uses OpenAI's Image API and requires:
+`POST /api/image` generates one image for the current story scene. It uses Gemini image generation and requires:
 
 ```txt
-OPENAI_IMAGE_API_KEY=...
-OPENAI_IMAGE_MODEL=gpt-image-1
-OPENAI_IMAGE_SIZE=1024x1024
-OPENAI_IMAGE_QUALITY=low
+GEMINI_API_KEY=...
+GEMINI_IMAGE_MODEL=gemini-2.5-flash-image
 ```
 
 The app intentionally uses a prompt like "warm 3D animated feature film look" instead of naming a specific studio style.

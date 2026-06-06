@@ -1,6 +1,9 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import { createClassAccessStore } from "./classAccess.js";
+import { buildGeminiImageRequest, extractGeminiImageResult } from "./geminiImage.js";
+import { toProviderErrorResponse } from "./providerErrors.js";
 
 dotenv.config();
 
@@ -8,16 +11,62 @@ const app = express();
 const port = Number(process.env.PORT || 3001);
 const providerName = (process.env.PROVIDER || "gemini").toLowerCase();
 const maxPerMinute = Number(process.env.MAX_PER_MIN || 20);
+const classResetCode = process.env.CLASS_RESET_CODE || "mosan-reset";
+const corsOrigin = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean)
+  : true;
 // Gemini 네이티브 이미지 생성 (무료 티어 지원)
 const geminiImageModel = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+const geminiThinkingBudget = Number(process.env.GEMINI_THINKING_BUDGET ?? 0);
 const rateBuckets = new Map();
+const classAccess = createClassAccessStore();
 
-app.use(cors({ origin: true }));
+// 동시 이미지 생성 요청 수를 제한해 Gemini RPM 초과를 방지
+const MAX_CONCURRENT_IMAGE = 3;
+const MAX_QUEUE_SIZE = 12;
+let activeImageCount = 0;
+const imageQueue = [];
+
+function acquireImageSlot(timeoutMs = 30000) {
+  return new Promise((resolve, reject) => {
+    if (activeImageCount >= MAX_CONCURRENT_IMAGE && imageQueue.length >= MAX_QUEUE_SIZE) {
+      return reject(new Error("image_queue_full"));
+    }
+
+    const release = () => {
+      activeImageCount--;
+      const next = imageQueue.shift();
+      if (next) next();
+    };
+
+    let timer = null;
+
+    const activate = () => {
+      clearTimeout(timer);
+      activeImageCount++;
+      resolve(release);
+    };
+
+    if (activeImageCount < MAX_CONCURRENT_IMAGE) {
+      return activate();
+    }
+
+    timer = setTimeout(() => {
+      const idx = imageQueue.indexOf(activate);
+      if (idx >= 0) imageQueue.splice(idx, 1);
+      reject(new Error("image_queue_timeout"));
+    }, timeoutMs);
+
+    imageQueue.push(activate);
+  });
+}
+
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: "64kb" }));
 
 const providers = {
   gemini: {
-    model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
     key: process.env.GEMINI_API_KEY,
     call: callGemini
   },
@@ -81,7 +130,7 @@ function buildPrompt(selection) {
     "1) 정확히 6쪽짜리 동화로 쓴다.",
     "2) 1쪽은 배경과 주인공 소개, 2쪽은 발단, 3쪽은 전개, 4쪽은 절정, 5쪽은 해결 행동, 6쪽은 결말과 배운 점으로 구성한다.",
     "3) 선택한 사건 문장을 그대로 복사하거나 따옴표로 넣지 말고, 자연스러운 장면으로 바꾸어 쓴다.",
-    "4) 각 쪽은 1~2문장, 쉬운 낱말, 존댓말(\"~했어요\")로 쓴다.",
+    "4) 각 쪽은 1문장으로 쓰고, 45~75자 안에서 쉬운 낱말과 존댓말(\"~했어요\")을 쓴다.",
     "5) 이전 쪽의 결과 때문에 다음 쪽 사건이 일어나도록 원인과 결과를 이어 준다.",
     "6) 주인공의 성격이 문제를 해결하는 행동으로 드러나야 한다.",
     "7) 주인공 이름의 조사를 받침에 맞게 올바르게 쓴다.",
@@ -113,8 +162,8 @@ function buildImagePrompt(selection, scene, pageIndex) {
     island: "dreamlike island, turquoise water, round rocks, colorful flowers, soft clouds",
     sea: "sparkling underwater world, coral gardens, bubbles, gentle blue light",
     cloud: "castle above the clouds, soft white cloud bridges, pearl towers, pastel sky",
-    baekma: "Baekma River inspired riverside in Buyeo, gentle water, reeds, warm historic atmosphere",
-    gungnamji: "Gungnamji pond inspired garden in Buyeo, lotus flowers, calm water, elegant pavilion"
+    hyeonchungsa: "Hyeonchungsa shrine in Asan, quiet historic Korean memorial grounds, traditional tiled buildings, pine trees, respectful warm atmosphere",
+    oeam: "Oeam Folk Village in Asan, traditional Korean hanok houses, stone walls, old village paths, gentle rural heritage atmosphere"
   };
 
   return [
@@ -124,7 +173,7 @@ function buildImagePrompt(selection, scene, pageIndex) {
     `Character bible: ${palette[characterId] || palette.kong}. This is the single named protagonist. Keep the exact same species, face shape, eye color, body proportions, outfit, scarf/accessories, colors, and facial features on every page.`,
     "Do not redesign the protagonist between pages. Do not change the protagonist into a different animal, different age, different costume, or different color palette.",
     "Supporting characters may appear only when needed by the story, but keep them small and secondary. They must not distract from, replace, duplicate, or be confused with the protagonist.",
-    "Do not include the Buyeo mascot, logo character, watermark, text labels, captions, or any extra sticker-like overlay inside the generated illustration.",
+    "Do not include Mori, the app guide mascot, logos, watermark, text labels, captions, or any extra sticker-like overlay inside the generated illustration.",
     `Setting bible: ${settingBible[placeKey] || settingBible.village}. Keep the same world design, palette, lighting mood, and material style across pages.`,
     "Use a consistent square storybook composition: protagonist clearly visible in the foreground or middle ground, clear foreground action, soft background depth, no extreme camera angle changes, no cropping that makes the character unrecognizable.",
     `Scene number: ${Number(pageIndex) + 1} of 6. Only selected pages are illustrated automatically, and the final page must work as a satisfying ending image.`,
@@ -161,7 +210,7 @@ function parseScenes(rawText) {
   for (const candidate of candidates) {
     try {
       const parsed = JSON.parse(candidate);
-      const scenes = Array.isArray(parsed) ? parsed : parsed.scenes;
+      const scenes = Array.isArray(parsed) ? parsed : parsed.scenes || parsed.pages;
       if (Array.isArray(scenes) && scenes.length >= 6) {
         return scenes.slice(0, 6).map((scene) => String(scene).trim()).filter(Boolean);
       }
@@ -193,15 +242,24 @@ async function fetchJson(url, options, timeoutMs = 8000) {
 
 async function callGemini(provider, prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${provider.model}:generateContent?key=${provider.key}`;
+  const generationConfig = {
+    maxOutputTokens: 2048,
+    responseMimeType: "application/json"
+  };
+
+  if (provider.model.includes("2.5") && Number.isFinite(geminiThinkingBudget)) {
+    generationConfig.thinkingConfig = { thinkingBudget: geminiThinkingBudget };
+  }
+
   const data = await fetchJson(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 1000, responseMimeType: "application/json" }
+      generationConfig
     })
-  });
+  }, 15000);
 
   return data.candidates?.[0]?.content?.parts?.map((part) => part.text).join("\n") || "";
 }
@@ -249,24 +307,23 @@ async function callGeminiImage(prompt) {
   const key = providers.gemini.key;
   if (!key) throw new Error("GEMINI_API_KEY not set");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiImageModel}:generateContent?key=${key}`;
-  const data = await fetchJson(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseModalities: ["IMAGE"] }
-    })
-  }, 45000);
+  const request = buildGeminiImageRequest({ model: geminiImageModel, key, prompt });
+  const data = await fetchJson(request.url, request.options, 45000);
+  return extractGeminiImageResult(data);
+}
 
-  const parts = data.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts.find((p) => p.inlineData?.mimeType?.startsWith("image/"));
-
-  if (!imagePart?.inlineData?.data) {
-    throw new Error(`이미지 없음: ${JSON.stringify(data).slice(0, 300)}`);
+async function callGeminiImageWithRetry(prompt) {
+  try {
+    return await callGeminiImage(prompt);
+  } catch (error) {
+    const msg = String(error?.message || "").toLowerCase();
+    if (msg.includes("429") || msg.includes("quota") || msg.includes("rate")) {
+      console.warn("Gemini image 429 — 3초 후 재시도");
+      await new Promise((r) => setTimeout(r, 3000));
+      return callGeminiImage(prompt);
+    }
+    throw error;
   }
-
-  return { b64: imagePart.inlineData.data, mimeType: imagePart.inlineData.mimeType };
 }
 
 function validateSelection(selection) {
@@ -290,8 +347,30 @@ app.get("/api/health", (req, res) => {
     model: provider.model,
     keyLoaded: Boolean(provider.key),
     imageModel: geminiImageModel,
-    imageKeyLoaded: Boolean(providers.gemini.key)
+    imageKeyLoaded: Boolean(providers.gemini.key),
+    thinkingBudget: geminiThinkingBudget
   });
+});
+
+app.post("/api/class-login", (req, res) => {
+  const result = classAccess.login({
+    classId: req.body?.classId,
+    sessionToken: req.body?.sessionToken
+  });
+
+  return res.status(result.ok ? 200 : 403).json(result);
+});
+
+app.post("/api/class-reset", (req, res) => {
+  if (String(req.body?.resetCode || "") !== classResetCode) {
+    return res.status(403).json({
+      ok: false,
+      reason: "invalid_reset_code",
+      message: "초기화 코드를 확인해 주세요."
+    });
+  }
+
+  return res.json(classAccess.reset());
 });
 
 app.post("/api/story", async (req, res) => {
@@ -307,6 +386,15 @@ app.post("/api/story", async (req, res) => {
   const selection = req.body?.selection;
   if (!validateSelection(selection)) {
     return res.status(400).json({ error: "invalid_selection" });
+  }
+
+  const access = classAccess.consumeUsage({
+    classId: req.body?.classId,
+    sessionToken: req.body?.sessionToken,
+    kind: "story"
+  });
+  if (!access.ok) {
+    return res.status(403).json({ error: "class_access_denied", ...access });
   }
 
   try {
@@ -332,18 +420,42 @@ app.post("/api/image", async (req, res) => {
   const selection = req.body?.selection;
   const scene = req.body?.scene;
   const pageIndex = Number(req.body?.pageIndex || 0);
+  const mode = req.body?.mode === "print" ? "printImage" : "coverImage";
 
   if (!validateSelection(selection) || typeof scene !== "string" || !scene.trim()) {
     return res.status(400).json({ error: "invalid_image_request" });
   }
 
+  const access = classAccess.consumeUsage({
+    classId: req.body?.classId,
+    sessionToken: req.body?.sessionToken,
+    kind: mode
+  });
+  if (!access.ok) {
+    return res.status(403).json({ error: "class_access_denied", ...access });
+  }
+
+  let release;
+  try {
+    release = await acquireImageSlot(30000);
+  } catch {
+    return res.status(429).json({
+      error: "image_quota_exceeded",
+      message: "이미지 생성 요청이 많아요. 잠시 뒤 다시 눌러 주세요.",
+      retryAfterSeconds: 15
+    });
+  }
+
   try {
     const prompt = buildImagePrompt(selection, scene, pageIndex);
-    const { b64, mimeType } = await callGeminiImage(prompt);
+    const { b64, mimeType } = await callGeminiImageWithRetry(prompt);
     return res.json({ imageBase64: b64, mimeType, prompt, provider: "gemini", model: geminiImageModel });
   } catch (error) {
     console.error(error);
-    return res.status(502).json({ error: "image_provider_failed" });
+    const response = toProviderErrorResponse(error, "image_provider_failed");
+    return res.status(response.statusCode).json(response.body);
+  } finally {
+    if (release) release();
   }
 });
 
