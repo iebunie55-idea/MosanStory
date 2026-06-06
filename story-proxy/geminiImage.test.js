@@ -20,7 +20,7 @@ describe("buildGeminiImageRequest", () => {
     assert.equal(request.url.includes("test-key"), false);
 
     const body = JSON.parse(request.options.body);
-    assert.deepEqual(body.generationConfig.responseModalities, ["Image"]);
+    assert.equal("generationConfig" in body, false);
     assert.equal(body.contents[0].parts[0].text, "Draw a friendly storybook rabbit.");
   });
 });

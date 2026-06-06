@@ -8,8 +8,7 @@ export function buildGeminiImageRequest({ model, key, prompt }) {
         "x-goog-api-key": key
       },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ["Image"] }
+        contents: [{ role: "user", parts: [{ text: prompt }] }]
       })
     }
   };
