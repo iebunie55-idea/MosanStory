@@ -49,6 +49,8 @@ Build Command: npm run build
 Output Directory: Next.js default
 ```
 
+The repository also includes `vercel.json` so Vercel uses the Next.js default output even if the dashboard was previously set to `out`.
+
 Set this Vercel environment variable before production deployment:
 
 ```txt
