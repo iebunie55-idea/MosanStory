@@ -12,8 +12,8 @@ echo [%date% %time%] node_modules missing. Running npm install...>> "%LOG_DIR%\s
 call npm.cmd install
 :after_npm_install
 
-if exist "%ROOT%out\index.html" goto after_build
-echo [%date% %time%] out folder missing. Running npm run build...>> "%LOG_DIR%\startup.log"
+if exist "%ROOT%.next\BUILD_ID" goto after_build
+echo [%date% %time%] .next build missing. Running npm run build...>> "%LOG_DIR%\startup.log"
 call npm.cmd run build
 :after_build
 
@@ -23,7 +23,7 @@ start "Buyeo Story Proxy" /min /D "%ROOT%story-proxy" node server.js
 powershell -NoProfile -Command "Start-Sleep -Seconds 3"
 
 echo [%date% %time%] Starting Buyeo AI Story app...>> "%LOG_DIR%\startup.log"
-start "Buyeo Story App" /min /D "%ROOT%" npm.cmd exec -- serve out -l tcp://127.0.0.1:3000
+start "Buyeo Story App" /min /D "%ROOT%" npm.cmd run start -- -H 127.0.0.1 -p 3000
 
 powershell -NoProfile -Command "Start-Sleep -Seconds 8"
 

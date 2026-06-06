@@ -2,7 +2,7 @@
 
 This project deploys as two services:
 
-1. The student tablet app: a static Next.js export.
+1. The student tablet app: a Next.js app hosted on Vercel.
 2. The AI proxy: a Node/Express service that keeps API keys off student devices.
 
 ## 1. Deploy the proxy on Render
@@ -46,7 +46,7 @@ Use the default Next.js build settings:
 ```txt
 Install Command: npm ci
 Build Command: npm run build
-Output Directory: out
+Output Directory: Next.js default
 ```
 
 Set this Vercel environment variable before production deployment:
