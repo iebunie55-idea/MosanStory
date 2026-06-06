@@ -27,7 +27,6 @@ GEMINI_MODEL=gemini-2.5-flash
 GEMINI_IMAGE_MODEL=gemini-2.5-flash-image
 GEMINI_THINKING_BUDGET=0
 CLASS_RESET_CODE=<teacher reset code>
-CORS_ORIGIN=<your deployed Vercel app URL>
 ```
 
 After deployment, confirm:
@@ -61,6 +60,14 @@ Deploy the project and open:
 ```txt
 https://<vercel-app>.vercel.app/story
 ```
+
+Then return to the Render proxy environment settings and add:
+
+```txt
+CORS_ORIGIN=https://<vercel-app>.vercel.app
+```
+
+Redeploy or restart the Render proxy after saving this value.
 
 ## 3. Classroom checklist
 
