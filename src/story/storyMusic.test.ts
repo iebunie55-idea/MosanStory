@@ -20,7 +20,15 @@ describe("musicGenres", () => {
     const genre = getMusicGenre(defaultMusicGenreId);
 
     expect(genre.label).toBe("평온");
-    expect(genre.notes.length).toBeGreaterThanOrEqual(4);
+    expect(genre.melody.length).toBeGreaterThanOrEqual(4);
     expect(genre.intervalMs).toBeGreaterThan(700);
+  });
+
+  test("uses layered chords and melody notes for softer generated background music", () => {
+    for (const genre of musicGenres) {
+      expect(genre.chords.length).toBeGreaterThanOrEqual(2);
+      expect(genre.melody.length).toBeGreaterThanOrEqual(4);
+      expect(genre.masterGain).toBeLessThanOrEqual(0.045);
+    }
   });
 });

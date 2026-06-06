@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildStoryPdfMetadata } from "./pdfMetadata";
 import { classSessionStorageKey, normalizeClassId } from "./classSession";
+import { getKioskArtworkSource } from "./storyArtwork";
 import { characters, eventGroups, places, traits } from "./storyData";
 import { checkProxyHealth, generateSceneImage, generateStory, localStory } from "./storyEngine";
 import {
@@ -303,11 +304,11 @@ function HeaderActionButton({
 }
 
 function KioskArtwork({
-  place,
+  imageSrc,
   generatedImage,
   guideText
 }: {
-  place: PlaceChoice;
+  imageSrc: string;
   generatedImage?: string;
   guideText: string;
 }) {
@@ -323,7 +324,7 @@ function KioskArtwork({
         <div
           aria-hidden="true"
           className="absolute inset-0 h-full w-full"
-          style={{ backgroundImage: `url(${place.imageSrc})`, backgroundPosition: "center", backgroundSize: "cover" }}
+          style={{ backgroundImage: `url(${imageSrc})`, backgroundPosition: "center", backgroundSize: "cover" }}
         />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-[#090D20]/50 via-transparent to-[#090D20]/5" />
@@ -664,6 +665,7 @@ export function StoryKioskApp() {
   );
   const currentStepIndex = stepOrder.indexOf(step);
   const currentSceneImage = step === "result" ? sceneImages[pageIndex] || fallbackSceneImage(sceneImages, pageIndex) : undefined;
+  const kioskArtworkImageSrc = getKioskArtworkSource({ step, placeImageSrc: place.imageSrc, generatedImage: currentSceneImage });
   const mascotGuide = useMemo(() => mascotGuideForStep(step, character.name), [character.name, step]);
   const selectedMusicGenre = useMemo(() => getMusicGenre(musicGenreId), [musicGenreId]);
   const printableImagesReady = IMAGE_PAGES.every((index) => Boolean(sceneImages[index]));
@@ -695,22 +697,35 @@ export function StoryKioskApp() {
     audioContextRef.current = null;
   }, []);
 
-  const playMusicNote = useCallback((frequency: number, genre: StoryMusicGenre) => {
+  const playTone = useCallback((frequency: number, duration: number, gainValue: number, waveform: OscillatorType) => {
     const context = audioContextRef.current;
     if (!context) return;
 
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    oscillator.type = genre.waveform;
+    oscillator.type = waveform;
     oscillator.frequency.setValueAtTime(frequency, context.currentTime);
     gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.055, context.currentTime + 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + genre.noteDuration);
+    gain.gain.exponentialRampToValueAtTime(gainValue, context.currentTime + 0.12);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
     oscillator.connect(gain);
     gain.connect(context.destination);
     oscillator.start();
-    oscillator.stop(context.currentTime + genre.noteDuration + 0.04);
+    oscillator.stop(context.currentTime + duration + 0.04);
   }, []);
+
+  const playMusicPhrase = useCallback((genre: StoryMusicGenre, phraseIndex: number) => {
+    const chord = genre.chords[phraseIndex % genre.chords.length] || genre.chords[0] || [];
+    const melody = genre.melody[phraseIndex % genre.melody.length];
+
+    chord.forEach((frequency) => {
+      playTone(frequency, genre.chordDuration, genre.padGain * genre.masterGain, genre.padWaveform);
+    });
+
+    if (melody) {
+      playTone(melody, genre.melodyDuration, genre.melodyGain * genre.masterGain, genre.waveform);
+    }
+  }, [playTone]);
 
   const startStoryMusic = useCallback((genre: StoryMusicGenre = selectedMusicGenre) => {
     const AudioContextConstructor =
@@ -719,14 +734,13 @@ export function StoryKioskApp() {
 
     stopStoryMusic();
     audioContextRef.current = new AudioContextConstructor();
-    const notes = genre.notes;
     let index = 0;
-    playMusicNote(notes[index], genre);
+    playMusicPhrase(genre, index);
     musicIntervalRef.current = window.setInterval(() => {
-      index = (index + 1) % notes.length;
-      playMusicNote(notes[index], genre);
+      index += 1;
+      playMusicPhrase(genre, index);
     }, genre.intervalMs);
-  }, [playMusicNote, selectedMusicGenre, stopStoryMusic]);
+  }, [playMusicPhrase, selectedMusicGenre, stopStoryMusic]);
 
   function toggleStoryMusic() {
     const nextState = nextMusicState(musicState);
@@ -1103,7 +1117,7 @@ export function StoryKioskApp() {
         <div className="grid min-h-0 w-full grid-cols-1 gap-4 overflow-hidden py-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(520px,1.15fr)] lg:items-stretch">
           <div className="relative min-h-0 overflow-hidden rounded-[30px] border-2 border-[#FFB15D]/80 bg-[#111936]/78 shadow-[0_0_36px_rgba(45,107,255,0.28)]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(125,232,255,0.18),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0))]" />
-            <KioskArtwork place={place} generatedImage={currentSceneImage} guideText={mascotGuide} />
+            <KioskArtwork imageSrc={kioskArtworkImageSrc} generatedImage={currentSceneImage} guideText={mascotGuide} />
             {step === "result" ? (
               <div className="pointer-events-none absolute inset-x-6 bottom-5 z-20 rounded-2xl border border-[#73DFFF]/30 bg-[#080D1F]/72 p-4 text-center font-black text-[#E8FCFF] shadow-[0_0_18px_rgba(125,232,255,0.18)] backdrop-blur">
                 {pageIndex + 1} / {story.pages.length}쪽
