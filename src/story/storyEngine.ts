@@ -1,4 +1,5 @@
 import type { StoryResult, StorySelection } from "./storyTypes";
+import { imageGenerationFailureMessage, type ImageGenerationResult } from "./imageGeneration";
 
 const PROXY_URL =
   process.env.NEXT_PUBLIC_STORY_PROXY_URL?.replace(/\/$/, "") || "http://localhost:3001";
@@ -143,7 +144,7 @@ export async function generateSceneImage(
   pageIndex: number,
   mode: "cover" | "print" = "cover",
   access: ClassAccessPayload = {}
-): Promise<{ imageDataUrl: string; prompt: string } | null> {
+): Promise<ImageGenerationResult | null> {
   try {
     const response = await fetchWithTimeout(
       `${PROXY_URL}/api/image`,
@@ -156,7 +157,12 @@ export async function generateSceneImage(
     );
 
     if (!response.ok) {
-      throw new Error("image proxy failed");
+      const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
+      const error = data.error || "image_provider_failed";
+      return {
+        error,
+        message: data.message || imageGenerationFailureMessage(error)
+      };
     }
 
     const data = (await response.json()) as { imageBase64?: string; mimeType?: string; prompt?: string };
@@ -169,7 +175,10 @@ export async function generateSceneImage(
       prompt: data.prompt || ""
     };
   } catch {
-    return null;
+    return {
+      error: "image_provider_failed",
+      message: imageGenerationFailureMessage("image_provider_failed")
+    };
   }
 }
 

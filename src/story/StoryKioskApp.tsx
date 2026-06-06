@@ -23,6 +23,7 @@ import {
 } from "./classSession";
 import { getKioskArtworkSource } from "./storyArtwork";
 import { characters, eventGroups, places, traits } from "./storyData";
+import { isGeneratedSceneImage } from "./imageGeneration";
 import { checkProxyHealth, generateSceneImage, generateStory, localStory } from "./storyEngine";
 import {
   defaultMusicGenreId,
@@ -655,6 +656,7 @@ export function StoryKioskApp() {
   const [health, setHealth] = useState<Awaited<ReturnType<typeof checkProxyHealth>>>(null);
   const [sceneImages, setSceneImages] = useState<Record<number, string>>({});
   const [imageGenerationMode, setImageGenerationMode] = useState<ImageGenerationMode>(null);
+  const [imageGenerationMessage, setImageGenerationMessage] = useState("");
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
   const [activeSavedStoryId, setActiveSavedStoryId] = useState<string | null>(null);
   const [customTrait, setCustomTrait] = useState("");
@@ -851,6 +853,7 @@ export function StoryKioskApp() {
     setPageIndex(0);
     setSceneImages({});
     setImageGenerationMode(null);
+    setImageGenerationMessage("");
     const result = await generateStory(storySelection, { classId, sessionToken: classSessionToken });
     setStory(result);
     setActiveSavedStoryId(storyId);
@@ -874,6 +877,7 @@ export function StoryKioskApp() {
     if (imageGenerationMode) return sceneImages;
 
     setImageGenerationMode(mode);
+    setImageGenerationMessage("");
     let nextImages = { ...sceneImages };
 
     try {
@@ -884,10 +888,13 @@ export function StoryKioskApp() {
         if (!scene) continue;
 
         const image = await generateSceneImage(selection, scene, index, mode, { classId, sessionToken: classSessionToken });
-        if (image) {
+        if (isGeneratedSceneImage(image)) {
           nextImages = { ...nextImages, [index]: image.imageDataUrl };
           setSceneImages(nextImages);
           persistActiveStoryImages(nextImages);
+        } else if (image?.message) {
+          setImageGenerationMessage(image.message);
+          break;
         }
       }
 
@@ -1369,6 +1376,11 @@ export function StoryKioskApp() {
                   <SecondaryButton onClick={generatePrintableImages} disabled={Boolean(imageGenerationMode) || printableImagesReady}>
                     <PrinterIcon className="h-5 w-5" /> {imageGenerationMode === "print" ? "출력용 그림 생성 중" : printableImagesReady ? "출력용 그림 완료" : "출력용 그림 만들기"}
                   </SecondaryButton>
+                  {imageGenerationMessage ? (
+                    <p className="col-span-1 rounded-xl border border-[#FFD073]/35 bg-[#2E2442]/80 px-3 py-2 text-xs font-black text-[#FFE9B0] sm:col-span-2">
+                      {imageGenerationMessage}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : null}

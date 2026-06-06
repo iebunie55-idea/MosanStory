@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import express from "express";
 import { createClassAccessStore } from "./classAccess.js";
 import { buildGeminiImageRequest, extractGeminiImageResult } from "./geminiImage.js";
+import { toProviderErrorResponse } from "./providerErrors.js";
 
 dotenv.config();
 
@@ -386,7 +387,8 @@ app.post("/api/image", async (req, res) => {
     return res.json({ imageBase64: b64, mimeType, prompt, provider: "gemini", model: geminiImageModel });
   } catch (error) {
     console.error(error);
-    return res.status(502).json({ error: "image_provider_failed" });
+    const response = toProviderErrorResponse(error, "image_provider_failed");
+    return res.status(response.statusCode).json(response.body);
   }
 });
 
